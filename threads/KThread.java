@@ -54,6 +54,10 @@ public class KThread {
 	 * create an idle thread as well.
 	 */
 	public KThread() {
+
+		// Initialize the semaphore
+		smp = new Semaphore(0);
+
 		if (currentThread != null) {
 			tcb = new TCB();
 		}
@@ -203,6 +207,7 @@ public class KThread {
 
 		currentThread.status = statusFinished;
 
+		this.smp.V();
 		sleep();
 	}
 
@@ -284,6 +289,10 @@ public class KThread {
 		Lib.debug(dbgThread, "Joining to thread: " + toString());
 
 		Lib.assertTrue(this != currentThread);
+
+		// Tell this thread(thread 2) to sleep 
+		this.smp.P();
+
 
 	}
 
@@ -411,10 +420,20 @@ public class KThread {
 	 * Tests whether this module is working.
 	 */
 	public static void selfTest() {
-		Lib.debug(dbgThread, "Enter KThread.selfTest");
+		KThread t1 = new KThread( new Runnable () {
+        	public void run() {
+            	for (int i = 0; i < 5; i++) {
+                	System.out.println("i = " + i);
+            	}
+        	}
+	    });
+	    t1.setName("Thread 1");
+	    t1.fork();
+	    t1.join();
+	    System.out.println("Reached part of code after t1.join(). t1 should be finshed at this point.");
+	    System.out.println("t1 finished? " + (t1.status == statusFinished));
+	    Lib.assertTrue((t1.status == statusFinished), " Expected t1 to be finished.");
 
-		new KThread(new PingTest(1)).setName("forked thread").fork();
-		new PingTest(0).run();
 	}
 
 	private static final char dbgThread = 't';
@@ -448,6 +467,8 @@ public class KThread {
 	private Runnable target;
 
 	private TCB tcb;
+
+	private Semaphore smp;
 
 	/**
 	 * Unique identifer for this thread. Used to deterministically compare

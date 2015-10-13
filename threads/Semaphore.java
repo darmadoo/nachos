@@ -33,6 +33,7 @@ public class Semaphore {
 
 	/**
 	 * Atomically wait for this semaphore to become non-zero and decrement it.
+	 * [WAIT] 
 	 */
 	public void P() {
 		boolean intStatus = Machine.interrupt().disable();
@@ -51,6 +52,7 @@ public class Semaphore {
 	/**
 	 * Atomically increment this semaphore and wake up at most one other thread
 	 * sleeping on this semaphore.
+	 * [SIGNAL]
 	 */
 	public void V() {
 		boolean intStatus = Machine.interrupt().disable();
