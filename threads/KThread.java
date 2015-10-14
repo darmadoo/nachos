@@ -55,6 +55,7 @@ public class KThread {
 	 */
 	public KThread() {
 
+		// Part 1.1
 		// Initialize the semaphore
 		smp = new Semaphore(0);
 
@@ -207,7 +208,9 @@ public class KThread {
 
 		currentThread.status = statusFinished;
 
-		this.smp.V();
+		// Part 1.1
+		smp.V();
+
 		sleep();
 	}
 
@@ -290,8 +293,9 @@ public class KThread {
 
 		Lib.assertTrue(this != currentThread);
 
+		// Part 1.1
 		// Tell this thread(thread 2) to sleep 
-		this.smp.P();
+		smp.P();
 
 
 	}
@@ -433,7 +437,12 @@ public class KThread {
 	    System.out.println("Reached part of code after t1.join(). t1 should be finshed at this point.");
 	    System.out.println("t1 finished? " + (t1.status == statusFinished));
 	    Lib.assertTrue((t1.status == statusFinished), " Expected t1 to be finished.");
+		
+	    Condition.selfTest();
 
+	    System.out.println("******************");
+
+	    Condition2.selfTest();
 	}
 
 	private static final char dbgThread = 't';
@@ -468,7 +477,8 @@ public class KThread {
 
 	private TCB tcb;
 
-	private Semaphore smp;
+	// Part 1.1
+	private static Semaphore smp;
 
 	/**
 	 * Unique identifer for this thread. Used to deterministically compare
