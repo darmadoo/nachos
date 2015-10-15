@@ -209,9 +209,13 @@ public class KThread {
 		currentThread.status = statusFinished;
 
 		// Part 1.1
-		smp.V();
+		currentThread.smpFinish();
 
 		sleep();
+	}
+
+	public void smpFinish(){
+		smp.V();
 	}
 
 	/**
@@ -478,7 +482,7 @@ public class KThread {
 	private TCB tcb;
 
 	// Part 1.1
-	private static Semaphore smp;
+	private Semaphore smp;
 
 	/**
 	 * Unique identifer for this thread. Used to deterministically compare

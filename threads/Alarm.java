@@ -30,6 +30,11 @@ public class Alarm {
 	 */
 	public void timerInterrupt() {
 		KThread.currentThread().yield();
+		// use the data structure to wake all the threads up when 
+		//  If the time its gets call >= time it should be woken up 
+		// Synchronization problems. [use disable/enable interrupts]
+		// Wrap them up 
+		// Wake it up if it is greater than equal to. 
 	}
 
 	/**
@@ -49,5 +54,30 @@ public class Alarm {
 		long wakeTime = Machine.timer().getTime() + x;
 		while (wakeTime > Machine.timer().getTime())
 			KThread.yield();
+
+		// store current thread in a data struct 
+		// Other threads can call waitUntil. Use priority Queue<Time> 
+		// Pair object with a KThread and TimeStamp 
+		// Synchronization problems. [use disable/enable interrupts]
+		// Wrap them up 
 	}
+
+	// Test Case
+	public static void selfTest() {
+	    KThread t1 = new KThread(new Runnable() {
+	        public void run() {
+	            long time1 = Machine.timer().getTime();
+	            int waitTime = 10000;
+	            System.out.println("Thread calling wait at time:" + time1);
+	            ThreadedKernel.alarm.waitUntil(waitTime);
+	            System.out.println("Thread woken up after:" + (Machine.timer().getTime() - time1));
+	            Lib.assertTrue((Machine.timer().getTime() - time1) > waitTime, " thread woke up too early.");
+	            
+	        }
+	    });
+	    t1.setName("T1");
+	    t1.fork();
+	    t1.join();
+	}
+
 }
