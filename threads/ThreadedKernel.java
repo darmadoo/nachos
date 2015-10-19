@@ -55,6 +55,8 @@ public class ThreadedKernel extends Kernel {
 
 		System.out.println("===== PART 3 =======");
 		Alarm.selfTest();
+		System.out.println("===== PART 4 =======");
+		Communicator.selfTest();
 	}
 
 	/**

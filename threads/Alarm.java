@@ -132,9 +132,6 @@ public class Alarm {
 
 		System.out.println("**************T2**************");
 
-
-
-
 		for(int x = 0; x < 200; x++){
 			KThread t2 = new KThread(new Runnable() {
 		        public void run() {
