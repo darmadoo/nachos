@@ -77,6 +77,9 @@ public class Condition2 {
 	 */
 	public void wakeAll() {
 		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+		while(!waitQueue.isEmpty()){
+			wake();
+		}
 	}
 
 	public static void selfTest(){
