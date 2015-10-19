@@ -13,7 +13,7 @@ import java.util.LinkedList;
  * @see nachos.threads.Condition
  */
 public class Condition2 {
-	/**
+	/** 	
 	 * Allocate a new condition variable.
 	 * 
 	 * @param conditionLock the lock associated with this condition variable.
