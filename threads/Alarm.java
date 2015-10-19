@@ -132,7 +132,7 @@ public class Alarm {
 
 		System.out.println("**************T2**************");
 
-		for(int x = 0; x < 200; x++){
+		for(int x = 0; x < 5; x++){
 			KThread t2 = new KThread(new Runnable() {
 		        public void run() {
 		            long time1 = Machine.timer().getTime();

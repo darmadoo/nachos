@@ -15,7 +15,7 @@ public class Communicator {
 	 */
 	public Communicator() {
 		buffer = 0;
-		count = 0;
+		isFull = false;
 		lock = new Lock();
 		notEmpty = new Condition(lock);
 		notFull = new Condition(lock);
@@ -23,7 +23,7 @@ public class Communicator {
 	}
 
 	private int buffer;
-	private int count, head, tail, capacity;
+	private boolean isFull;
  	private Lock lock;
  	private Condition notEmpty, notFull, sync;
 
@@ -40,13 +40,16 @@ public class Communicator {
 	public void speak(int word) {
 		lock.acquire();
 
-		notFull.sleep();
-		count++;
+		// If the bucket is full
+		while(isFull){
+			notFull.sleep();
+		}
 
 		buffer = word;
+		isFull = true;
+		notEmpty.wake();
 		sync.sleep();
 
-		notEmpty.wake();
 		lock.release();
 	}
 
@@ -59,16 +62,16 @@ public class Communicator {
 	public int listen() {
 		lock.acquire();
 
-		while(count == 0){
+		while(!isFull){
 			notEmpty.sleep();
 		}
-
-		count--;
+		
 		int word = buffer;
+		isFull = false;
 		sync.wake();
 		notFull.wake();
+		
 		lock.release();
-
 		return word;
 	}
 
@@ -113,5 +116,5 @@ public class Communicator {
 	    Lib.assertTrue(times[0] < times[2], "speak returned before listen.");
 	    Lib.assertTrue(times[1] < times[3], "speak returned before listen.");
 	}
-	
+
 }
