@@ -39,24 +39,18 @@ public class Communicator {
 	 */
 	public void speak(int word) {
 		lock.acquire();
-		System.out.println("A1");
 
 		// If the bucket is full
 		while(isFull){
-			System.out.println("A2");
-			listen.sleep();
+			speak.sleep();
 		}
 
 		buffer = word;
-		System.out.println("the buffer is " + word);
 		isFull = true;
-		System.out.println("is full is " + isFull);
+		listen.wake();
+		sync.sleep();	
 		speak.wake();
-		System.out.println("A3");
-		sync.sleep();
-		System.out.println("A4");
 		lock.release();
-		System.out.println("SPEAK return");
 	}
 
 	/**
@@ -67,23 +61,15 @@ public class Communicator {
 	 */
 	public int listen() {
 		lock.acquire();
-		System.out.println("B1");
 
 		while(!isFull){
-			System.out.println("B2");
-			speak.sleep();
+			listen.sleep();
 		}
 		
 		int word = buffer;
-		System.out.println("The word is " + word);
 		isFull = false;
-		System.out.println("The full is now " + isFull);
 		sync.wake();
-		System.out.println("B3");
-		listen.wake();
-		System.out.println("B4");
 		lock.release();
-		System.out.println("Listener return 89 " + word );
 		return word;
 	}
 
@@ -125,8 +111,8 @@ public class Communicator {
 	    
 	    Lib.assertTrue(words[0] == 4, "Didn't listen back spoken word."); 
 	    Lib.assertTrue(words[1] == 7, "Didn't listen back spoken word.");
-	    Lib.assertTrue(times[0] < times[2], "speak returned before listen.");
-	    Lib.assertTrue(times[1] < times[3], "speak returned before listen.");
+	    Lib.assertTrue(times[0] > times[2], "speak returned before listen.");
+	    Lib.assertTrue(times[1] > times[3], "speak returned before listen.");
 	}
 
 }
