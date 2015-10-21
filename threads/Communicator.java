@@ -17,15 +17,15 @@ public class Communicator {
 		buffer = 0;
 		isFull = false;
 		lock = new Lock();
-		notEmpty = new Condition(lock);
-		notFull = new Condition(lock);
+		speak = new Condition(lock);
+		listen = new Condition(lock);
 		sync = new Condition(lock);
 	}
 
 	private int buffer;
 	private boolean isFull;
  	private Lock lock;
- 	private Condition notEmpty, notFull, sync;
+ 	private Condition speak, listen, sync;
 
 	/**
 	 * Wait for a thread to listen through this communicator, and then transfer
@@ -39,18 +39,24 @@ public class Communicator {
 	 */
 	public void speak(int word) {
 		lock.acquire();
+		System.out.println("A1");
 
 		// If the bucket is full
 		while(isFull){
-			notFull.sleep();
+			System.out.println("A2");
+			listen.sleep();
 		}
 
 		buffer = word;
+		System.out.println("the buffer is " + word);
 		isFull = true;
-		notEmpty.wake();
+		System.out.println("is full is " + isFull);
+		speak.wake();
+		System.out.println("A3");
 		sync.sleep();
-
+		System.out.println("A4");
 		lock.release();
+		System.out.println("SPEAK return");
 	}
 
 	/**
@@ -61,17 +67,23 @@ public class Communicator {
 	 */
 	public int listen() {
 		lock.acquire();
+		System.out.println("B1");
 
 		while(!isFull){
-			notEmpty.sleep();
+			System.out.println("B2");
+			speak.sleep();
 		}
 		
 		int word = buffer;
+		System.out.println("The word is " + word);
 		isFull = false;
+		System.out.println("The full is now " + isFull);
 		sync.wake();
-		notFull.wake();
-		
+		System.out.println("B3");
+		listen.wake();
+		System.out.println("B4");
 		lock.release();
+		System.out.println("Listener return 89 " + word );
 		return word;
 	}
 
