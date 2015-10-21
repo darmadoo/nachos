@@ -1,5 +1,4 @@
 package nachos.threads;
-import java.util.Comparator;
 import java.util.PriorityQueue;
 import nachos.machine.*;
 
@@ -9,7 +8,7 @@ import nachos.machine.*;
  */
 public class Alarm {
 
-	private class Pair implements Comparator<Pair>{
+	private class Pair implements Comparable<Pair>{
 		public KThread kthread;
 		public long timeStamp;
 
@@ -19,10 +18,11 @@ public class Alarm {
 		}
 
 		@Override
-		public int compare(Pair one, Pair two) {
-			if (one.timeStamp < two.timeStamp) return -1;
-        	if (one.timeStamp > two.timeStamp) return 1;
+		public int compareTo(Pair that) {
+			if (this.timeStamp < that.timeStamp) return -1;
+        	if (this.timeStamp > that.timeStamp) return 1;
         	return 0;
+			// return Long.signum(wakeTime - that.wakeTime);
 		}
 	}
 
@@ -132,7 +132,7 @@ public class Alarm {
 
 		System.out.println("**************T2**************");
 
-		for(int x = 0; x < 5; x++){
+		for(int x = 0; x < 200; x++){
 			KThread t2 = new KThread(new Runnable() {
 		        public void run() {
 		            long time1 = Machine.timer().getTime();
