@@ -53,9 +53,7 @@ public class ThreadedKernel extends Kernel {
 			ElevatorBank.selfTest();
 		}
 
-		System.out.println("===== PART 3 =======");
 		Alarm.selfTest();
-		System.out.println("===== PART 4 =======");
 		Communicator.selfTest();
 	}
 

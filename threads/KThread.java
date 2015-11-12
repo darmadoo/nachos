@@ -443,9 +443,6 @@ public class KThread {
 	    Lib.assertTrue((t1.status == statusFinished), " Expected t1 to be finished.");
 		
 	    Condition.selfTest();
-
-	    System.out.println("******************");
-
 	    Condition2.selfTest();
 	}
 

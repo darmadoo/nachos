@@ -25,8 +25,11 @@ public class UserProcess {
 	public UserProcess() {
 		int numPhysPages = Machine.processor().getNumPhysPages();
 		pageTable = new TranslationEntry[numPhysPages];
-		for (int i = 0; i < numPhysPages; i++)
+		for (int i = 0; i < numPhysPages; i++){
 			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
+		}
+
+		
 	}
 
 	/**
@@ -413,12 +416,69 @@ public class UserProcess {
 		switch (syscall) {
 		case syscallHalt:
 			return handleHalt();
+		case syscallWrite:
+			return handleWrite(a0, a1, a2);
+		case sysCallOpen:
+			return handleOpen(a0);
 
 		default:
 			Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 			Lib.assertNotReached("Unknown system call!");
 		}
 		return 0;
+	}
+
+	/*
+		==== NEW FUNCTION FOR PROJECT 2 =======
+	*/
+	protected int handleWrite(int fileDescriptor, int bufferVA, int count){
+		// need to check if fd is valid 
+		if(fileDescriptor >= maxFileCount || fileDescriptor < 0){
+			Lib.debug(dbgProcess, "MMM: The file fileDescriptor is either greater than 16 or less than 0");
+			return -1;
+		}
+
+		if(count < 0 && bufferVA < 0){
+			Lib.debug(dbgProcess, "MMM: The count is less than 0 and the buffer is less than 0");
+			return -1;
+		}
+
+		// need to open file 
+
+
+		if(of == null){
+			Lib.debug(dbgProcess, "MMM: Failed to open file");
+			return -1;
+		}
+
+		// Allocate a byte buffer
+		byte dataBuffer[] = new byte[count];
+
+		int r = readVirtualMemory(bufferVA, dataBuffer, 0, count);
+
+		r = of[fd].write(dataBuffer, 0, r);
+
+		return r;
+	}
+
+	protected int handleOpen(int fileIndex){
+		// Get the string name
+		String filename = readVirtualMemoryString(fileIndex, maxFileCount);
+
+		if(filename == null){
+			Lib.debug(dbgProcess, "MMM: File is out of bounds");
+			return -1;
+		}
+
+		OpenFile tempOpenFile = UserKernel.fileSystem.open(fileName, false);
+
+		if(tempOpenFile == null){
+			Lib.debug(dbgProcess, "MMM: Cannot open file");
+			return -1;
+		}
+
+		// TODO check if being deleted
+
 	}
 
 	/**
@@ -449,6 +509,18 @@ public class UserProcess {
 		}
 	}
 
+	// NEW CLASS 
+	public class fileTable{
+		// Initialize the array of files 
+		OpenFile openFile[] = new OpenFile[maxFileCount];
+
+		public fileTable(){
+			add(0, UserKernel.console.openForReading());
+			add(1, UserKernel.console.openForWriting());
+		}
+
+	}	
+
 	/** The program being run by this process. */
 	protected Coff coff;
 
@@ -468,4 +540,7 @@ public class UserProcess {
 	private static final int pageSize = Processor.pageSize;
 
 	private static final char dbgProcess = 'a';
+
+	// SELF DEFINED VARIBALES 
+	protected static final int maxFileCount = 16;
 }
