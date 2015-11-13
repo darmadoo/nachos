@@ -46,6 +46,7 @@ public class ThreadedKernel extends Kernel {
 	 * here.
 	 */
 	public void selfTest() {
+		/*
 		KThread.selfTest();
 		Semaphore.selfTest();
 		SynchList.selfTest();
@@ -55,7 +56,10 @@ public class ThreadedKernel extends Kernel {
 
 		Alarm.selfTest();
 		Communicator.selfTest();
+		*/
 	}
+	
+
 
 	/**
 	 * A threaded kernel does not run user programs, so this method does

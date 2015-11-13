@@ -72,7 +72,7 @@ public class Communicator {
 		lock.release();
 		return word;
 	}
-
+/*
 	public static void selfTest(){
 	    final Communicator com = new Communicator();
 	    final long times[] = new long[4];
@@ -114,5 +114,6 @@ public class Communicator {
 	    Lib.assertTrue(times[0] > times[2], "speak returned before listen.");
 	    Lib.assertTrue(times[1] > times[3], "speak returned before listen.");
 	}
+	*/
 
 }

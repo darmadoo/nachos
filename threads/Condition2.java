@@ -81,7 +81,7 @@ public class Condition2 {
 			wake();
 		}
 	}
-
+/*
 	public static void selfTest(){
 	    final Lock lock = new Lock();
 	    // final Condition empty = new Condition(lock);
@@ -121,6 +121,7 @@ public class Condition2 {
 	    consumer.join();
 	    producer.join();
 	}
+	*/
 
 	private Lock conditionLock;
 

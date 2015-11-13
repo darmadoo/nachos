@@ -427,6 +427,7 @@ public class KThread {
 	/**
 	 * Tests whether this module is working.
 	 */
+	/*
 	public static void selfTest() {
 		KThread t1 = new KThread( new Runnable () {
         	public void run() {
@@ -445,7 +446,7 @@ public class KThread {
 	    Condition.selfTest();
 	    Condition2.selfTest();
 	}
-
+*/
 	private static final char dbgThread = 't';
 
 	/**

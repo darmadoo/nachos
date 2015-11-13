@@ -108,7 +108,7 @@ public class Condition {
 		while (!waitQueue.isEmpty())
 			wake();
 	}
-
+/*
 	public static void selfTest(){
 	    final Lock lock = new Lock();
 	    final Condition empty = new Condition(lock);
@@ -148,6 +148,7 @@ public class Condition {
 	    consumer.join();
 	    producer.join();
 	}
+	*/
 
 	private Lock conditionLock;
 

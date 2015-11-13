@@ -112,7 +112,7 @@ public class Alarm {
 		//	KThread.yield();
 		
 	}
-
+/*
 	// Test Case
 	public static void selfTest() {
 	    KThread t1 = new KThread(new Runnable() {
@@ -156,5 +156,5 @@ public class Alarm {
 		}
 
 	}
-
+*/
 }
