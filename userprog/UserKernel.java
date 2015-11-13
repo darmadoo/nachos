@@ -3,6 +3,7 @@ package nachos.userprog;
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
+import java.util.LinkedList;
 
 /**
  * A kernel that can support multiple user processes.
@@ -21,8 +22,10 @@ public class UserKernel extends ThreadedKernel {
 	 */
 	public void initialize(String[] args) {
 		super.initialize(args);
-
 		console = new SynchConsole(Machine.console());
+
+		// Load all free pages.
+		for (int i = 0; i < Machine.processor().getNumPhysPages(); i++){ freePages.add(i); }
 
 		Machine.processor().setExceptionHandler(new Runnable() {
 			public void run() {
@@ -108,10 +111,42 @@ public class UserKernel extends ThreadedKernel {
 		super.terminate();
 	}
 
+
+	public static int[] allocatePages(int numPages) { 
+		lock.acquire();
+
+		// Return null if there is no more physcial memory left.
+		if (freePhysicalPages.size() < numPages) {
+			lock.release();
+			return null;
+		}
+
+		// Create allocated array of physcial page index's.
+		int[] allocated = new int[numPages];
+		for (int i = 0; i < num; i++){
+			result[i] = freePhysicalPages.remove();
+		}
+
+		lock.release();
+		return allocated;
+	}
+
+	public static void releasePages(TranslationEntry[] pageTable, int numPages) {
+		listLock.acquire();
+		for (int i = 0; i < numPages; i++){
+			freePhysicalPages.add(pageTable[i].ppn)
+		}
+		listLock.release();
+	}
+
 	/** Globally accessible reference to the synchronized console. */
 	public static SynchConsole console;
 
 	// dummy variables to make javac smarter
 	private static Coff dummy1 = null;
 	public static int PID = 0;
+
+	public static LinkedList<Integer> freePhysicalPages = new LinkedList<Integer>();;
+	public static Lock lock = new Lock();
+
 }

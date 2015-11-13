@@ -26,11 +26,11 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
-		int numPhysPages = Machine.processor().getNumPhysPages();
-		pageTable = new TranslationEntry[numPhysPages];
-		for (int i = 0; i < numPhysPages; i++){
-			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
-		}
+		// int numPhysPages = Machine.processor().getNumPhysPages();
+		// pageTable = new TranslationEntry[numPhysPages];
+		// for (int i = 0; i < numPhysPages; i++){
+			// pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
+		// }
 
 		addToFiles(0, UserKernel.console.openForReading());
 		addToFiles(1, UserKernel.console.openForWriting());	
@@ -133,21 +133,51 @@ public class UserProcess {
 	 * array.
 	 * @return the number of bytes successfully transferred.
 	 */
+	// public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
+	// 	Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
+
+	// 	byte[] memory = Machine.processor().getMemory();
+	// 	//  Machine.processor().getNumPhysPages()
+	// 	// The TranslationEntry class represents a single virtual-to-physical page translation.
+
+	// 	// for now, just assume that virtual addresses equal physical addresses
+	// 	if (vaddr < 0 || vaddr >= memory.length)
+	// 		return 0;
+
+	// 	int amount = Math.min(length, memory.length - vaddr);
+	// 	System.arraycopy(memory, vaddr, data, offset, amount);
+
+	// 	// TODO do the actually virtual 
+
+	// 	return amount;
+	// }
+
 	public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
-		Lib.assertTrue(offset >= 0 && length >= 0
-				&& offset + length <= data.length);
+		Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
 
 		byte[] memory = Machine.processor().getMemory();
 
-		// for now, just assume that virtual addresses equal physical addresses
-		if (vaddr < 0 || vaddr >= memory.length)
-			return 0;
+		int vpn1    = Processor.pageFromAddress(vaddr);
+		int offset1 = Processor.offsetFromAddress(vaddr);
+		int vpn2    = Processor.pageFromAddress(vaddr + length);
 
-		int amount = Math.min(length, memory.length - vaddr);
-		System.arraycopy(memory, vaddr, data, offset, amount);
+		int amount = (length < (pageSize - offset1)) ? length : (pageSize - offset1);
+		offset = offset + amount;
 
-		// TODO do the actually virtual 
+		TranslationEntry e = getTranslationEntry(vpn1, false);
+		if (e == null) { return 0; }
 
+		System.arraycopy(memory, Processor.makeAddress(e.ppn, offset1), data, offset, amount);
+
+		int length2;
+		for (int i = vpn1 + 1; i < vpn2 + 1; i++) {
+			length2 = length - amount < pageSize ? length - amount : pageSize;
+			e = getTranslationEntry(i, false);
+			if (e == null) { return amount; }
+			System.arraycopy(memory, Processor.makeAddress(e.ppn, 0), data, offset, len);
+			amount = amount + length2;
+			offset = offset + length2;
+		}
 		return amount;
 	}
 
@@ -294,21 +324,37 @@ public class UserProcess {
 			return false;
 		}
 
+		// Get physicall page allocation.
+		int[] physicalPageNums = UserKernel.allocatePages(numPages);
+
+		// Return false if there is no physicall memory left.
+		if(physicalPageNums == null){
+			coff.close();
+			return false;
+		}
+		
+		// Initallize pageTable.
+		pageTable = new TranslationEntry[numPages];
+
+
 		// load sections
 		for (int s = 0; s < coff.getNumSections(); s++) {
 			CoffSection section = coff.getSection(s);
 
-			Lib.debug(dbgProcess, "\tinitializing " + section.getName()
-					+ " section (" + section.getLength() + " pages)");
+			Lib.debug(dbgProcess, "\tinitializing " + section.getName() + " section (" + section.getLength() + " pages)");
 
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
-
-				// for now, just assume virtual addresses=physical addresses
-				section.loadPage(i, vpn);
+				int ppn = physicalPageNums[vpn];
+				pageTable[vpn] = new TranslationEntry(vpn, ppn, true, section.isReadOnly(), false, false);
+				section.loadPage(i, ppn);
 			}
 		}
 
+		// allocate free pages for stack and argv
+		for (int i = numPages - stackPages - 1; i < numPages; i++) {
+			pageTable[i] = new TranslationEntry(i, physicalPageNums[i], true, false, false, false);
+		}
 		return true;
 	}
 
@@ -317,10 +363,7 @@ public class UserProcess {
 	 */
 	protected void unloadSections() {
 		coff.close();
-		
-		// for (int i = 0; i < numPages; i++){
-			// UserKernel.releasePage(pageTable[i].ppn);
-		// }
+		UserKernel.releasePages(pageTable, numPages);
 		pageTable = null;
 	}
 
