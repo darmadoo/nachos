@@ -5,6 +5,9 @@ import nachos.threads.*;
 import nachos.userprog.*;
 
 import java.io.EOFException;
+import java.util.Hashtable;
+import java.util.Vector;
+
 
 /**
  * Encapsulates the state of a user process that is not contained in its user
@@ -29,7 +32,8 @@ public class UserProcess {
 			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
 		}
 
-		
+		addToFiles(0, UserKernel.console.openForReading());
+		addToFiles(1, UserKernel.console.openForWriting());	
 	}
 
 	/**
@@ -141,6 +145,8 @@ public class UserProcess {
 
 		int amount = Math.min(length, memory.length - vaddr);
 		System.arraycopy(memory, vaddr, data, offset, amount);
+
+		// TODO do the actually virtual 
 
 		return amount;
 	}
@@ -310,6 +316,12 @@ public class UserProcess {
 	 * Release any resources allocated by <tt>loadSections()</tt>.
 	 */
 	protected void unloadSections() {
+		coff.close();
+		
+		// for (int i = 0; i < numPages; i++){
+			// UserKernel.releasePage(pageTable[i].ppn);
+		// }
+		pageTable = null;
 	}
 
 	/**
@@ -418,12 +430,22 @@ public class UserProcess {
 			return handleHalt();
 		case syscallWrite:
 			return handleWrite(a0, a1, a2);
-		case sysCallOpen:
+		case syscallOpen:
 			return handleOpen(a0);
+		case syscallRead:
+			return handleRead(a0, a1, a2);
+		case syscallClose:
+			return handleClose(a0);
+		case syscallUnlink:
+			return handleUnlink(a0);
+		case syscallExit:
+			return handleExit(a0);
+		case syscallCreate:
+			return handleCreate(a0);
 
 		default:
-			Lib.debug(dbgProcess, "Unknown syscall " + syscall);
-			Lib.assertNotReached("Unknown system call!");
+			Lib.debug(dbgProcess, "Unknown syscall ");
+			Lib.assertNotReached("Unknown system call! " + syscall);
 		}
 		return 0;
 	}
@@ -431,41 +453,69 @@ public class UserProcess {
 	/*
 		==== NEW FUNCTION FOR PROJECT 2 =======
 	*/
-	protected int handleWrite(int fileDescriptor, int bufferVA, int count){
+	protected int handleWrite(int fileDescriptor, int buffer, int count){
 		// need to check if fd is valid 
 		if(fileDescriptor >= maxFileCount || fileDescriptor < 0){
 			Lib.debug(dbgProcess, "MMM: The file fileDescriptor is either greater than 16 or less than 0");
 			return -1;
 		}
 
-		if(count < 0 && bufferVA < 0){
+		if(count < 0 || buffer < 0){
 			Lib.debug(dbgProcess, "MMM: The count is less than 0 and the buffer is less than 0");
 			return -1;
 		}
 
-		// need to open file 
+		// Get current file.
+		OpenFile openFile = getFile(fileDescriptor);
 
-
-		if(of == null){
+		if(openFile == null){
 			Lib.debug(dbgProcess, "MMM: Failed to open file");
 			return -1;
 		}
 
 		// Allocate a byte buffer
 		byte dataBuffer[] = new byte[count];
+		int r = readVirtualMemory(buffer, dataBuffer, 0, count);
 
-		int r = readVirtualMemory(bufferVA, dataBuffer, 0, count);
+		if(r == 0){
+			// Buffer is invalid
+			return -1;
+		}
 
-		r = of[fd].write(dataBuffer, 0, r);
+		// public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
 
-		return r;
+		return openFile.write(dataBuffer, 0, r);
+	}
+
+
+	protected int handleCreate(int name) {
+		String fileName = readVirtualMemoryString(name, maxStringLength);
+
+		if (fileName == null) {
+			Lib.debug(dbgProcess, "MMM: Invalid file name pointer");
+			return -1;
+		}
+
+		// if (deleted.contains(fileName)) {
+		// 	Lib.debug(dbgProcess, "File is being deleted");
+		// 	return -1;
+		// }
+
+		OpenFile file = UserKernel.fileSystem.open(fileName, true);
+
+		if (file == null) {
+			Lib.debug(dbgProcess, "MMM: Create file failed");
+			return -1;
+		}
+
+		return addToFiles(file);
 	}
 
 	protected int handleOpen(int fileIndex){
 		// Get the string name
-		String filename = readVirtualMemoryString(fileIndex, maxFileCount);
+		String fileName = readVirtualMemoryString(fileIndex, maxStringLength);
 
-		if(filename == null){
+		if(fileName == null){
 			Lib.debug(dbgProcess, "MMM: File is out of bounds");
 			return -1;
 		}
@@ -477,8 +527,83 @@ public class UserProcess {
 			return -1;
 		}
 
-		// TODO check if being deleted
+		// TODO: check if being deleted
+		return addToFiles(tempOpenFile);
 
+	}
+
+	protected int handleRead(int fileDescriptor, int buffer, int count) {
+		if(count < 0 || buffer < 0){
+			Lib.debug(dbgProcess, "MMM: The count is less than 0 and the buffer is less than 0");
+			return -1;
+		}
+
+		OpenFile openFile = getFile(fileDescriptor);
+
+		if(openFile == null){
+			Lib.debug(dbgProcess, "MMM: Failed to open file");
+			return -1;
+		}
+
+		byte buf[] = new byte[count];
+		int length = openFile.read(buf, 0, count);
+
+		if (length == -1) {
+			Lib.debug(dbgProcess, "MMM: Fail to read from file");
+			return -1;
+		}
+
+		return writeVirtualMemory(buffer, buf, 0, length);
+	}
+
+	protected int handleClose(int fileDescriptor) {
+		OpenFile openFile = getFile(fileDescriptor);
+			
+		if(openFile == null) {
+			Lib.debug(dbgProcess, "MMM: file descriptor doesn't exist");
+			return -1;
+		}
+		// Clear	
+		files[fileDescriptor] = null;
+		openFile.close();
+		return 0;
+	}
+
+	protected int handleExit(int status) {
+		// this.status = status;
+		
+		// for (int i = 2; i < maxFileCount; i++){
+			// fileTable.close(i);
+		// }
+
+		// unloadSections();
+
+		// allProcesses.remove(PID);
+		// diedProcesses.put(PID, this);
+
+		// finished.V();
+
+		// if (allProcesses.isEmpty())
+			Kernel.kernel.terminate();
+
+		UThread.finish();
+
+		return 0;
+	}
+
+	protected int handleUnlink(int name) {
+		String fileName = readVirtualMemoryString(name, maxStringLength);
+
+		if (fileName == null) {
+			Lib.debug(dbgProcess, "MMM: File is out of bounds");
+			return -1;
+		}
+
+		if (!UserKernel.fileSystem.remove(fileName)){
+				return -1;
+		}
+
+		return 0;
 	}
 
 	/**
@@ -509,16 +634,33 @@ public class UserProcess {
 		}
 	}
 
-	// NEW CLASS 
-	public class fileTable{
-		// Initialize the array of files 
-		OpenFile openFile[] = new OpenFile[maxFileCount];
 
-		public fileTable(){
-			add(0, UserKernel.console.openForReading());
-			add(1, UserKernel.console.openForWriting());
+	private int addToFiles(OpenFile openFile){
+		for(int index = 0; index < maxFileCount; index++){
+			if(files[index] == null){
+				return addToFiles(index, openFile);
+			}
+		}
+		return -1;
+	}
+	private int addToFiles(int index, OpenFile openFile){
+		if(index < 0 || index >= maxFileCount){
+			return -1;
 		}
 
+		// Save the file if space is avaiable.
+		if(files[index] == null) {
+			files[index] = openFile;
+			return index;
+		} else {
+			return -1;
+		}
+	}
+
+	public OpenFile getFile(int fileDescriptor) {
+		if (fileDescriptor < 0 || fileDescriptor >= maxFileCount)
+			return null;
+		return files[fileDescriptor];
 	}	
 
 	/** The program being run by this process. */
@@ -541,6 +683,9 @@ public class UserProcess {
 
 	private static final char dbgProcess = 'a';
 
+	private OpenFile files[] = new OpenFile[maxFileCount];
+
 	// SELF DEFINED VARIBALES 
 	protected static final int maxFileCount = 16;
+	protected static final int maxStringLength = 256;
 }
