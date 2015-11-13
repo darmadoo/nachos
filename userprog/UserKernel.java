@@ -1,8 +1,9 @@
 package nachos.userprog;
 
+import java.util.LinkedList;
+
 import nachos.machine.*;
 import nachos.threads.*;
-import nachos.userprog.*;
 
 /**
  * A kernel that can support multiple user processes.
@@ -24,6 +25,11 @@ public class UserKernel extends ThreadedKernel {
 
 		console = new SynchConsole(Machine.console());
 
+		listLock = new Lock();
+		freePages = new LinkedList<Integer>();
+		for (int i = 0; i < Machine.processor().getNumPhysPages(); i++)
+			freePages.add(i);
+
 		Machine.processor().setExceptionHandler(new Runnable() {
 			public void run() {
 				exceptionHandler();
@@ -36,17 +42,17 @@ public class UserKernel extends ThreadedKernel {
 	 */
 	public void selfTest() {
 		super.selfTest();
-
+		
 		System.out.println("Testing the console device. Typed characters");
 		System.out.println("will be echoed until q is typed.");
-
+		
 		char c;
-
+		
 		do {
-			c = (char) console.readByte(true);
-			console.writeByte(c);
+		c = (char) console.readByte(true);
+		console.writeByte(c);
 		} while (c != 'q');
-
+		
 		System.out.println("");
 	}
 
@@ -94,11 +100,12 @@ public class UserKernel extends ThreadedKernel {
 		super.run();
 
 		UserProcess process = UserProcess.newUserProcess();
+		rootProcess = process;
 
 		String shellProgram = Machine.getShellProgramName();
 		Lib.assertTrue(process.execute(shellProgram, new String[] {}));
 
-		KThread.currentThread().finish();
+		KThread.finish();
 	}
 
 	/**
@@ -108,9 +115,37 @@ public class UserKernel extends ThreadedKernel {
 		super.terminate();
 	}
 
+	public static int[] allocatePages(int num) {
+		listLock.acquire();
+
+		if (freePages.size() < num) {
+			listLock.release();
+			return null;
+		}
+
+		int[] result = new int[num];
+
+		for (int i = 0; i < num; i++)
+			result[i] = freePages.remove();
+
+		listLock.release();
+
+		return result;
+	}
+
+	public static void releasePage(int ppn) {
+		listLock.acquire();
+		freePages.add(ppn);
+		listLock.release();
+	}
+
 	/** Globally accessible reference to the synchronized console. */
 	public static SynchConsole console;
 
-	// dummy variables to make javac smarter
-	private static Coff dummy1 = null;
+	/** Globally accessible reference to the root process. */
+	public static UserProcess rootProcess = null;
+
+	/** A global linked list of free physical pages. */
+	public static LinkedList<Integer> freePages;
+	public static Lock listLock;
 }
