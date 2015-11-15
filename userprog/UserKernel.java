@@ -25,7 +25,8 @@ public class UserKernel extends ThreadedKernel {
 		console = new SynchConsole(Machine.console());
 
 		// Load all free pages.
-		for (int i = 0; i < Machine.processor().getNumPhysPages(); i++){ freePages.add(i); }
+		lock = new Lock();
+		for (int i = 0; i < Machine.processor().getNumPhysPages(); i++){ freePhysicalPages.add(i); }
 
 		Machine.processor().setExceptionHandler(new Runnable() {
 			public void run() {
@@ -123,8 +124,8 @@ public class UserKernel extends ThreadedKernel {
 
 		// Create allocated array of physcial page index's.
 		int[] allocated = new int[numPages];
-		for (int i = 0; i < num; i++){
-			result[i] = freePhysicalPages.remove();
+		for (int i = 0; i < numPages; i++){
+			allocated[i] = freePhysicalPages.remove();
 		}
 
 		lock.release();
@@ -132,11 +133,11 @@ public class UserKernel extends ThreadedKernel {
 	}
 
 	public static void releasePages(TranslationEntry[] pageTable, int numPages) {
-		listLock.acquire();
+		lock.acquire();
 		for (int i = 0; i < numPages; i++){
-			freePhysicalPages.add(pageTable[i].ppn)
+			freePhysicalPages.add(pageTable[i].ppn);
 		}
-		listLock.release();
+		lock.release();
 	}
 
 	/** Globally accessible reference to the synchronized console. */
@@ -146,8 +147,8 @@ public class UserKernel extends ThreadedKernel {
 	private static Coff dummy1 = null;
 	public static int PID = 0;
 	
-	public static LinkedList<Integer> freePhysicalPages = new LinkedList<Integer>();;
-	public static Lock lock = new Lock();
+	public static LinkedList<Integer> freePhysicalPages = new LinkedList<Integer>();
+	public static Lock lock;
 
 }
 
