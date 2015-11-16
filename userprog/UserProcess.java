@@ -3,10 +3,9 @@ package nachos.userprog;
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
-
 import java.io.EOFException;
-import java.util.Hashtable;
-import java.util.Vector;
+import java.util.HashMap;
+
 
 
 /**
@@ -26,6 +25,10 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
+		PID = UserKernel.PID;
+		UserKernel.PID++;
+		exitProperly = false;
+		exitStatus = 0;
 		addToFiles(0, UserKernel.console.openForReading());
 		addToFiles(1, UserKernel.console.openForWriting());	
 	}
@@ -53,8 +56,8 @@ public class UserProcess {
 		if (!load(name, args))
 			return false;
 
-		new UThread(this).setName(name).fork();
-
+		uthread = new UThread(this);
+		uthread.setName(name).fork();
 		return true;
 	}
 
@@ -511,6 +514,10 @@ public class UserProcess {
 			return handleExit(a0);
 		case syscallCreate:
 			return handleCreate(a0);
+		case syscallExec:
+			return handleExec(a0, a1, a2);
+		case syscallJoin:
+			return handleJoin(a0, a1);
 
 		default:
 			Lib.debug(dbgProcess, "Unknown syscall ");
@@ -596,7 +603,6 @@ public class UserProcess {
 			return -1;
 		}
 
-		// TODO: check if being deleted
 		return addToFiles(tempOpenFile);
 
 	}
@@ -638,24 +644,61 @@ public class UserProcess {
 		return 0;
 	}
 
+	protected int handleExec(int file, int argc, int argv) {
+		String fileName = readVirtualMemoryString(file, maxStringLength);
+
+		// Check for invalid file name and proper arguments.
+		if (fileName == null || !fileName.endsWith(".coff") || (argc < 0) ) { return -1; }
+
+		// Store values.
+		String[] args = new String[argc];
+		byte[] buffer = new byte[4 * argc];
+		readVirtualMemory(argv, buffer);
+
+		// Loop thgought each argument.
+		for (int i = 0; i < argc; i++) {
+			String read = readVirtualMemoryString(argv, maxStringLength);
+			if(read == null) { return -1; }
+			args[i] = read;
+		}
+
+		// Start new child process.
+		UserProcess child = newUserProcess();
+		childProcesses.put(child.PID, child);
+
+		if(!child.execute(fileName, args)) { return -1; }
+
+		return child.PID;
+	}
+
+	protected int handleJoin(int processID, int status) {
+		if (!childProcesses.containsKey(processID)) { return -1; }
+
+		// childProcesses.remove(processID); // Remove??
+
+		UserProcess child = childProcesses.get(processID);
+		if (child == null) { return -1; }
+
+		if(!child.exitProperly){ child.uthread.join(); }
+
+		if (child.exitStatus < 0){ return 0; }
+		writeVirtualMemory(status, Lib.bytesFromInt(child.exitStatus));
+
+		return 1;
+	}
+
 	protected int handleExit(int status) {
-		// this.status = status;
+		exitStatus = status;
+		exitProperly = true;
+		unloadSections();
+		childProcesses.clear();
 		
-		// for (int i = 2; i < maxFileCount; i++){
-			// fileTable.close(i);
-		// }
+		for (int i = 2; i < maxFileCount; i++){
+			if(files[i] != null) { handleClose(i); }
+		}
 
-		// unloadSections();
-
-		// allProcesses.remove(PID);
-		// diedProcesses.put(PID, this);
-
-		// finished.V();
-
-		// if (allProcesses.isEmpty())
-			Kernel.kernel.terminate();
-
-		UThread.finish();
+		Kernel.kernel.terminate();
+		uthread.finish();
 
 		return 0;
 	}
@@ -755,6 +798,11 @@ public class UserProcess {
 	private OpenFile files[] = new OpenFile[maxFileCount];
 
 	// SELF DEFINED VARIBALES 
+	public boolean exitProperly;
+	public int exitStatus;
+	public UThread uthread;
+	public int PID;
+	private HashMap<Integer, UserProcess> childProcesses = new HashMap<Integer, UserProcess>();
 	protected static final int maxFileCount = 16;
 	protected static final int maxStringLength = 256;
 }
