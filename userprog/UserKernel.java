@@ -124,8 +124,10 @@ public class UserKernel extends ThreadedKernel {
 
 		// Create allocated array of physcial page index's.
 		int[] allocated = new int[numPages];
-		for (int i = 0; i < numPages; i++){
-			allocated[i] = freePhysicalPages.remove();
+		int index = 0;
+		while (index < numPages) {
+			allocated[index] = freePhysicalPages.remove();
+			index++;
 		}
 
 		lock.release();
