@@ -236,7 +236,6 @@ public class UserProcess {
 			System.arraycopy(data, offset, memory, Processor.makeAddress(getWriteTE(i).ppn, 0), Math.min(length - amount, pageSize));
 			offset = offset + Math.min(length - amount, pageSize);
 			amount = amount + Math.min(length - amount, pageSize);
-			Lib.debug(dbgProcess, "MMM: amount: "+ amount);
 		}
 		return amount;
 	}
@@ -531,15 +530,9 @@ public class UserProcess {
 	*/
 	protected int handleWrite(int fileDescriptor, int buffer, int count){
 		// need to check if fd is valid 
-		if(fileDescriptor >= maxFileCount || fileDescriptor < 0){
-			Lib.debug(dbgProcess, "MMM: The file fileDescriptor is either greater than 16 or less than 0");
-			return -1;
-		}
+		if(fileDescriptor >= maxFileCount || fileDescriptor < 0){return -1; }
 
-		if(count < 0 || buffer < 0){
-			Lib.debug(dbgProcess, "MMM: The count is less than 0 and the buffer is less than 0");
-			return -1;
-		}
+		if(count < 0 || buffer < 0){return -1; }
 
 		// Get current file.
 		OpenFile openFile = getFile(fileDescriptor);
@@ -567,22 +560,11 @@ public class UserProcess {
 	protected int handleCreate(int name) {
 		String fileName = readVirtualMemoryString(name, maxStringLength);
 
-		if (fileName == null) {
-			Lib.debug(dbgProcess, "MMM: Invalid file name pointer");
-			return -1;
-		}
-
-		// if (deleted.contains(fileName)) {
-		// 	Lib.debug(dbgProcess, "File is being deleted");
-		// 	return -1;
-		// }
+		if (fileName == null) { return -1; }
 
 		OpenFile file = UserKernel.fileSystem.open(fileName, true);
 
-		if (file == null) {
-			Lib.debug(dbgProcess, "MMM: Create file failed");
-			return -1;
-		}
+		if (file == null) { return -1; }
 
 		return addToFiles(file);
 	}
@@ -591,42 +573,27 @@ public class UserProcess {
 		// Get the string name
 		String fileName = readVirtualMemoryString(fileIndex, maxStringLength);
 
-		if(fileName == null){
-			Lib.debug(dbgProcess, "MMM: File is out of bounds");
-			return -1;
-		}
+		if(fileName == null){return -1; }
 
 		OpenFile tempOpenFile = UserKernel.fileSystem.open(fileName, false);
 
-		if(tempOpenFile == null){
-			Lib.debug(dbgProcess, "MMM: Cannot open file");
-			return -1;
-		}
+		if(tempOpenFile == null){return -1; }
 
 		return addToFiles(tempOpenFile);
 
 	}
 
 	protected int handleRead(int fileDescriptor, int buffer, int count) {
-		if(count < 0 || buffer < 0){
-			Lib.debug(dbgProcess, "MMM: The count is less than 0 and the buffer is less than 0");
-			return -1;
-		}
+		if(count < 0 || buffer < 0){return -1; }
 
 		OpenFile openFile = getFile(fileDescriptor);
 
-		if(openFile == null){
-			Lib.debug(dbgProcess, "MMM: Failed to open file");
-			return -1;
-		}
+		if(openFile == null){return -1; }
 
 		byte buf[] = new byte[count];
 		int length = openFile.read(buf, 0, count);
 
-		if (length == -1) {
-			Lib.debug(dbgProcess, "MMM: Fail to read from file");
-			return -1;
-		}
+		if (length == -1) {return -1; }
 
 		return writeVirtualMemory(buffer, buf, 0, length);
 	}
