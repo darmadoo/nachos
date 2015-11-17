@@ -1,0 +1,29 @@
+Mark Darmadi
+	-what code you wrote
+		Wrote loadsections and a few of the system call handler functions.
+	-how well it worked
+		Badly. But with enough tears, it eventually worked.
+	-how was the code tested
+		Mohammed did the testing.
+	-how Mark contributed to the project
+		Coded
+		
+Mohammed Islam
+	-what code you wrote
+		Most of the system call handler functions.
+	-how well it worked
+		Not too well for a long time. Eventually it did.
+	-how was the code tested
+		Code was tested using the test initially provided. Also used tests the volker made, write1, write4, write10, and snake.
+	-how Mo contributed to the project
+		Handled all the testing, did a lot of administrative stuff, wrote most system call handler functions.
+
+Micah Rothenbuhler	
+	-what code you wrote
+		ReadVirtualMemory and WriteVirtualMemory.
+	-how well it worked
+		Like a freakin charm after a while. Was difficult at first
+	-how was the code tested
+		Mohammed did the testing.
+	-how Micah contributed to the project
+		Well. I wrote some of the code.
