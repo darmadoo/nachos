@@ -22,10 +22,10 @@ do_creat (char *fname) {
     printf ("creating %s...\n", fname);
     fd = creat (fname);
     if (fd >= 0) {
-	printf ("...passed (fd = %d)\n", fd);
+    printf ("...passed (fd = %d)\n", fd);
     } else {
-	printf ("...failed (%d)\n", fd);
-	exit (-1);
+    printf ("...failed (%d)\n", fd);
+    exit (-1);
     }
     return fd;
 }
@@ -37,10 +37,10 @@ do_open (char *fname) {
     printf ("opening %s...\n", fname);
     fd = open (fname);
     if (fd >= 0) {
-	printf ("...passed (fd = %d)\n", fd);
+    printf ("...passed (fd = %d)\n", fd);
     } else {
-	printf ("...failed (%d)\n", fd);
-	exit (-1);
+    printf ("...failed (%d)\n", fd);
+    exit (-1);
     }
     return fd;
 }
@@ -52,7 +52,7 @@ do_close (int fd) {
     printf ("closing %d...\n", fd);
     r = close (fd);
     if (r < 0) {
-	printf ("...failed (r = %d)\n", r);
+    printf ("...failed (r = %d)\n", r);
     }
 }
 
@@ -71,18 +71,18 @@ do_write (char *fname, char *buffer, int len, int stride)
     ptr = buffer, remain = len;
     printf ("writing %d bytes to file, %d bytes at a time...\n", len, stride);
     while (remain > 0) {
-	int n = ((remain < stride) ? remain : stride);
-	r = write (fd, ptr, n);
-	if (r < 0) {
-	    printf ("...failed (r = %d)\n", r);
-	} else if (r != n) {
-	    printf ("...failed (expected to write %d bytes, but wrote %d)\n", n, r);
-	} else {
-	    printf ("...passed (wrote %d bytes)\n", r);
-	}
-	
-	ptr += stride;
-	remain -= stride;
+    int n = ((remain < stride) ? remain : stride);
+    r = write (fd, ptr, n);
+    if (r < 0) {
+        printf ("...failed (r = %d)\n", r);
+    } else if (r != n) {
+        printf ("...failed (expected to write %d bytes, but wrote %d)\n", n, r);
+    } else {
+        printf ("...passed (wrote %d bytes)\n", r);
+    }
+    
+    ptr += stride;
+    remain -= stride;
     }
 
     do_close (fd);
@@ -105,29 +105,29 @@ do_validate (char *fname, char *buffer, char *truth, int len)
     printf ("reading %s into buffer...\n", fname);
     r = read (fd, buffer, len);
     if (r < 0) {
-	printf ("...failed (r = %d)\n", r);
-	do_close (fd);
-	return;
+    printf ("...failed (r = %d)\n", r);
+    do_close (fd);
+    return;
     } else if (r != len) {
-	printf ("...failed (expected to read %d bytes, but read %d)\n", len, r);
-	do_close (fd);
-	return;
+    printf ("...failed (expected to read %d bytes, but read %d)\n", len, r);
+    do_close (fd);
+    return;
     } else {
-	printf ("...success\n");
+    printf ("...success\n");
     }
 
     r = 0;
     printf ("validating %s...\n", fname);
     while (r < len) {
-	if (buffer[r] != truth[r]) {
-	    printf ("...failed (offset %d: expected %c, read %c)\n",
-		    r, truth[r], buffer[r]);
-	    break;
-	}
-	r++;
+    if (buffer[r] != truth[r]) {
+        printf ("...failed (offset %d: expected %c, read %c)\n",
+            r, truth[r], buffer[r]);
+        break;
+    }
+    r++;
     }
     if (r == len) {
-	printf ("...passed\n");
+    printf ("...passed\n");
     }
 
     do_close (fd);
@@ -163,7 +163,7 @@ main ()
     file = "binary.out";
     len = sizeof (bigbuf1);  /* len in units of bytes, bigbufnum in ints */
     for (i = 0; i < bigbufnum; i++) {
-	bigbuf1[i] = i;
+    bigbuf1[i] = i;
     }
 
     /* write all at once */
@@ -182,18 +182,27 @@ main ()
     printf ("writing to an invalid fd (%d)...\n", fd);
     r = write (fd, buffer, len);
     if (r < 0) {
-	printf ("...passed (r = %d)\n", r);
+    printf ("...passed (r = %d)\n", r);
     } else {
-	printf ("...failed (r = %d, should be -1)\n", r);
+    printf ("...failed (r = %d, should be -1)\n", r);
     }
 
     fd = 256, len = 10;  /* value of len should not matter... */
     printf ("writing to an invalid fd (%d)...\n", fd);
     r = write (fd, buffer, len);
     if (r < 0) {
-	printf ("...passed (r = %d)\n", r);
+    printf ("...passed (r = %d)\n", r);
     } else {
-	printf ("...failed (r = %d, should be -1)\n", r);
+    printf ("...failed (r = %d, should be -1)\n", r);
+    }
+
+    fd = 8, len = 10;  /* value of len should not matter... */
+    printf ("writing to an unopened fd (%d)...\n", fd);
+    r = write (fd, buffer, len);
+    if (r < 0) {
+    printf ("...passed (r = %d)\n", r);
+    } else {
+    printf ("...failed (r = %d, should be -1)\n", r);
     }
 
     file = "bad.out";
@@ -203,38 +212,37 @@ main ()
     printf ("writing count = 0 bytes...\n");
     r = write (fd, buffer, 0);
     if (r == 0) {
-	printf ("...passed\n");
+    printf ("...passed\n");
     } else {
-	printf ("...failed (r = %d)\n", r);
+    printf ("...failed (r = %d)\n", r);
     }
 
     printf ("writing with an invalid buffer (should not crash, only return an error)...\n");
     r = write (fd, (char *) 0xBADFFF, 10);
     if (r < 0) {
-	printf ("...passed (r = %d)\n", r);
+    printf ("...passed (r = %d)\n", r);
     } else {
-	printf ("...failed (r = %d)\n", r);
+    printf ("...failed (r = %d)\n", r);
     }
 
     /* test count */
     printf ("writing with an invalid count (should not crash, only return an error)...\n");
     r = write (fd, (char *) str, -1);
     if (r < 0) {
-	printf ("...passed (r = %d)\n", r);
+    printf ("...passed (r = %d)\n", r);
     } else {
-	printf ("...failed (r = %d)\n", r);
+    printf ("...failed (r = %d)\n", r);
     }
 
     printf ("writing with a buffer that extends beyond the end of the\n");
-    printf ("address space.  Nachos should stop at the end and return the\n");
-    printf ("number of bytes written.  coincidentally, given the way write\n");
-    printf ("is invoked, this literally copies the current contents of the\n");
-    printf ("entire address space to the file.\n");
+    printf ("address space.  either return -1 or truncate the operation\n");
+    printf ("and stop at the end and return the number of bytes written.\n");
+    printf ("we will accept both behaviors.\n");
     r = write (fd, (char *) 0, (80 * 1024));
-    if (r <= 0) {
-	printf ("...failed (r = %d)\n", r);
+    if (r == (80 * 1024)) {
+    printf ("...failed (r = %d)\n", r);
     } else {
-	printf ("...likely passed, check r (r = %d)\n", r);
+    printf ("...likely passed, check r (r = %d)\n", r);
     }
     return 0;
 }
