@@ -11,10 +11,30 @@
  */
 
 #include "syscall.h"
+#include "stdio.h"
+#include "stdlib.h"
 
 int
 main()
 {
-    halt();
+    // halt();
+    char *argv[3];
+	argv[0] = "world";
+	argv[1] = "input.txt";
+	argv[2] = "69";
+	
+
+    int status = -100;	
+
+    // int p2 = exec("matmult.coff", 0, argv);
+    // int p3 = exec("write1.coff", 0, argv);
+    // join(p3, &status);
+    // join(p2, &status);
+
+	int p4 = exec("cat.coff", 2, argv);
+	status = join(p4, &status);
+
+
+    printf("end of halt, %d\n", status);
     /* not reached */
 }

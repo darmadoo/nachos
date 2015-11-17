@@ -8,6 +8,7 @@ char buf[BUFSIZE];
 
 int main(int argc, char** argv)
 {
+
   int fd, amount;
 
   fd = open("input.txt");
@@ -21,6 +22,7 @@ int main(int argc, char** argv)
   }
 
   close(fd);
+  printf("\n");
 
   return 0;
 }

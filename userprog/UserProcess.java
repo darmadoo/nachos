@@ -25,8 +25,10 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
-		PID = UserKernel.PID;
-		UserKernel.PID++;
+		// PID = UserKernel.PID;
+		// UserKernel.PID++;
+		PID = processCount++;
+		UserProcess.totalPID++;
 		exitProperly = false;
 		exitStatus = 0;
 		addToFiles(0, UserKernel.console.openForReading());
@@ -131,63 +133,52 @@ public class UserProcess {
 	 * @return the number of bytes successfully transferred.
 	 */
 
-	// public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
-	// 	Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
-
-	// 	byte[] memory = Machine.processor().getMemory();
-
-	// 	int vpn1    = Processor.pageFromAddress(vaddr);
-	// 	int vpn2    = Processor.pageFromAddress(vaddr + length);
-	// 	int vaOffset = Processor.offsetFromAddress(vaddr);
-	// 	int amount = Math.min(length, pageSize - vaOffset);
-		
-	// 	if (getReadTE(vpn1) == null) { return 0; }
-
-	// 	System.arraycopy(memory, Processor.makeAddress(getReadTE(vpn1).ppn, vaOffset), data, offset, amount);
-	// 	offset = offset + amount;
-
-	// 	for (int i = vpn1 + 1; i < vpn2 + 1; i++) {			
-	// 		if (getReadTE(i) == null) { return amount; }
-	// 		System.arraycopy(memory, Processor.makeAddress(getReadTE(i).ppn, 0), data, offset, Math.min(length - amount, pageSize));
-	// 		amount = amount + Math.min(length - amount, pageSize);
-	// 		offset = offset + Math.min(length - amount, pageSize);
-	// 	}
-	// 	return amount;
-	// }
-
 	public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
 		Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
 		byte[] memory = Machine.processor().getMemory();
-		if (vaddr < 0 || vaddr >= memory.length) { return 0; }
+		if (vaddr < 0 || vaddr >= memory.length) { return -1; }
+		return readWriteHelper(vaddr, data, offset, length, memory, false) - vaddr;
+	}
 
-		int vpn1     = Processor.pageFromAddress(vaddr);
-		int vpn2     = Processor.pageFromAddress(vaddr + length);
-		int vaOffset = Processor.offsetFromAddress(vaddr);
-		int amount = Math.min(length, pageSize - vaOffset);
-		
-		if (getReadTE(vpn1) == null) { return 0; }
+	private int readWriteHelper(int vaddr, byte[] data, int offset, int length, byte[] memory, boolean isWrite){
+		int currentAddress = vaddr;
+		while(length > 0){
+			int vpn             = Machine.processor().pageFromAddress(currentAddress);
+			int offset2         = Machine.processor().offsetFromAddress(currentAddress);
+			TranslationEntry et = (isWrite) ? getWriteTE(vpn) : getReadTE(vpn);
+			if(et == null){ return currentAddress; }
 
-		System.arraycopy(memory, Processor.makeAddress(getReadTE(vpn1).ppn, vaOffset), data, offset, amount);	
-		offset = offset + amount;
+			int paddr  = Machine.processor().makeAddress(et.ppn, offset2);		
 
-		for (int i = vpn1 + 1; i < vpn2 + 1; i++) {			
-			if (getReadTE(i) == null) { return amount; }
-			System.arraycopy(memory, Processor.makeAddress(getReadTE(i).ppn, 0), data, offset, Math.min(length - amount, pageSize));
-			offset = offset + Math.min(length - amount, pageSize);
-			amount = amount + Math.min(length - amount, pageSize);
+		    if(paddr < 0 || paddr >= memory.length) { handleException(Machine.processor().exceptionAddressError); }
+
+		    int nextPage = Machine.processor().pageFromAddress(paddr) + 1;
+		    int nextAddr = Machine.processor().makeAddress(nextPage, 0) - paddr;
+		    int amount   = Math.min(length, nextAddr);
+
+		    if(isWrite){
+		    	System.arraycopy(data, offset, memory, paddr, amount);
+		    } else {
+		    	System.arraycopy(memory, paddr, data, offset, amount);
+		    }
+		    
+		    currentAddress = currentAddress + amount;
+		    offset = offset + amount;
+		    length = length - amount;
 		}
-		return amount;
+
+		return currentAddress;
 	}
 
 	private TranslationEntry getReadTE(int vpn){
 		if (vpn < 0 || vpn >= numPages || pageTable[vpn] == null){
+			Lib.debug(dbgProcess, "MMM: getReadTE null " + " vpn: " + vpn);
 			return null;
 		}
 		TranslationEntry translationEntry = pageTable[vpn];
 		translationEntry.used = true;
 		return translationEntry;
 	}
-
 
 	/**
 	 * Transfer all data from the specified array to this process's virtual
@@ -219,25 +210,8 @@ public class UserProcess {
 	public int writeVirtualMemory(int vaddr, byte[] data, int offset, int length) {
 		Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
 		byte[] memory = Machine.processor().getMemory();
-		if (vaddr < 0 || vaddr >= memory.length) { return 0; }
-
-		int vpn1     = Processor.pageFromAddress(vaddr);
-		int vpn2     = Processor.pageFromAddress(vaddr + length);
-		int vaOffset = Processor.offsetFromAddress(vaddr);
-		int amount = Math.min(length, pageSize - vaOffset);
-		
-		if (getWriteTE(vpn1) == null) { return 0; }
-
-		System.arraycopy(data, offset, memory, Processor.makeAddress(getWriteTE(vpn1).ppn, vaOffset), amount);
-		offset = offset + amount;
-
-		for (int i = vpn1 + 1; i < vpn2 + 1; i++) {			
-			if (getWriteTE(i) == null) { return amount; }
-			System.arraycopy(data, offset, memory, Processor.makeAddress(getWriteTE(i).ppn, 0), Math.min(length - amount, pageSize));
-			offset = offset + Math.min(length - amount, pageSize);
-			amount = amount + Math.min(length - amount, pageSize);
-		}
-		return amount;
+		if (vaddr < 0 || vaddr >= memory.length) { return -1; }
+		return readWriteHelper(vaddr, data, offset, length, memory, true) - vaddr;
 	}
 
 	private TranslationEntry getWriteTE(int vpn){
@@ -529,10 +503,11 @@ public class UserProcess {
 		==== NEW FUNCTION FOR PROJECT 2 =======
 	*/
 	protected int handleWrite(int fileDescriptor, int buffer, int count){
+		Lib.debug(dbgProcess, "MMM: write buffer: " + buffer);
 		// need to check if fd is valid 
-		if(fileDescriptor >= maxFileCount || fileDescriptor < 0){return -1; }
+		if(fileDescriptor >= maxFileCount || fileDescriptor < 0){ return -1; }
 
-		if(count < 0 || buffer < 0){return -1; }
+		if(count < 0 || buffer < 0){ return -1; }
 
 		// Get current file.
 		OpenFile openFile = getFile(fileDescriptor);
@@ -546,8 +521,9 @@ public class UserProcess {
 		byte dataBuffer[] = new byte[count];
 		int r = readVirtualMemory(buffer, dataBuffer, 0, count);
 
-		if(r == 0){
+		if(r == -1){
 			// Buffer is invalid
+			Lib.debug(dbgProcess, "MMM: r == 0 ");
 			return -1;
 		}
 
@@ -584,19 +560,27 @@ public class UserProcess {
 	}
 
 	protected int handleRead(int fileDescriptor, int buffer, int count) {
-		if(count < 0 || buffer < 0){return -1; }
+		Lib.debug(dbgProcess, "MMM: write read: " + buffer);
+		if(fileDescriptor < 0 || fileDescriptor >= files.length || count < 0 || buffer < 0){ return -1; }
 
 		OpenFile openFile = getFile(fileDescriptor);
-
-		if(openFile == null){return -1; }
+		if(openFile == null){ return -1; }
 
 		byte buf[] = new byte[count];
 		int length = openFile.read(buf, 0, count);
-
-		if (length == -1) {return -1; }
+		if (length < 0) { return -1; }
 
 		return writeVirtualMemory(buffer, buf, 0, length);
 	}
+
+    private boolean bufferIsReadOnly(int virtualAddress) {
+        int vpn = virtualAddress / this.pageSize;
+		for(int i = 0; i < this.pageTable.length; i++) {
+	    	if(this.pageTable[i].vpn == vpn) return this.pageTable[i].readOnly;
+	    	else continue;
+		}
+		return false;
+    }
 
 	protected int handleClose(int fileDescriptor) {
 		OpenFile openFile = getFile(fileDescriptor);
@@ -619,20 +603,19 @@ public class UserProcess {
 
 		// Store values.
 		String[] args = new String[argc];
-		byte[] buffer = new byte[4 * argc];
-		readVirtualMemory(argv, buffer);
-
-		// Loop thgought each argument.
 		for (int i = 0; i < argc; i++) {
-			String read = readVirtualMemoryString(argv, maxStringLength);
-			if(read == null) { return -1; }
-			args[i] = read;
+			byte[] buffer = new byte[4];
+			if(readVirtualMemory(argv + i * 4, buffer) < 0){ return -1; }
+
+			int value = Lib.bytesToInt(buffer, 0, 4);
+			args[i] = readVirtualMemoryString(value, maxStringLength);
+			if(args[i] == null){ return -1; }
+
 		}
 
 		// Start new child process.
 		UserProcess child = newUserProcess();
 		childProcesses.put(child.PID, child);
-
 		if(!child.execute(fileName, args)) { return -1; }
 
 		return child.PID;
@@ -641,9 +624,8 @@ public class UserProcess {
 	protected int handleJoin(int processID, int status) {
 		if (!childProcesses.containsKey(processID)) { return -1; }
 
-		// childProcesses.remove(processID); // Remove??
-
 		UserProcess child = childProcesses.get(processID);
+
 		if (child == null) { return -1; }
 
 		if(!child.exitProperly){ child.uthread.join(); }
@@ -658,13 +640,16 @@ public class UserProcess {
 		exitStatus = status;
 		exitProperly = true;
 		unloadSections();
-		childProcesses.clear();
+		// childProcesses.clear();
 		
 		for (int i = 2; i < maxFileCount; i++){
 			if(files[i] != null) { handleClose(i); }
 		}
 
-		Kernel.kernel.terminate();
+		if(--UserProcess.totalPID == 0){
+			Kernel.kernel.terminate();	
+		}
+
 		uthread.finish();
 
 		return 0;
@@ -672,15 +657,8 @@ public class UserProcess {
 
 	protected int handleUnlink(int name) {
 		String fileName = readVirtualMemoryString(name, maxStringLength);
-
-		if (fileName == null) {
-			Lib.debug(dbgProcess, "MMM: File is out of bounds");
-			return -1;
-		}
-
-		if (!UserKernel.fileSystem.remove(fileName)){
-				return -1;
-		}
+		if (fileName == null) { return -1; }
+		if (!UserKernel.fileSystem.remove(fileName)){ return -1; }
 
 		return 0;
 	}
@@ -769,6 +747,8 @@ public class UserProcess {
 	public int exitStatus;
 	public UThread uthread;
 	public int PID;
+	public static int processCount = 0;
+	public static int totalPID = 0;
 	private HashMap<Integer, UserProcess> childProcesses = new HashMap<Integer, UserProcess>();
 	protected static final int maxFileCount = 16;
 	protected static final int maxStringLength = 256;
