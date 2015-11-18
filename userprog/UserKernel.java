@@ -125,7 +125,9 @@ public class UserKernel extends ThreadedKernel {
 		int[] allocated = new int[numPages];
 		int index = 0;
 		while (index < numPages) {
+			// Remove from the physical pages as we insert into the pageTable
 			allocated[index] = freePhysicalPages.remove();
+			// Move to the next index
 			index++;
 		}
 
@@ -136,6 +138,7 @@ public class UserKernel extends ThreadedKernel {
 	public static void releasePages(TranslationEntry[] pageTable, int numPages) {
 		lock.acquire();
 		for (int i = 0; i < numPages; i++){
+			// Add into the page table as before we release 
 			freePhysicalPages.add(pageTable[i].ppn);
 		}
 		lock.release();

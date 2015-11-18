@@ -151,38 +151,57 @@ public class UserProcess {
 
 	// Helper method for read and write virtual memory
 	private int readWriteHelper(int vaddr, byte[] data, int offset, int length, byte[] memory, boolean isWrite){
+		// save the current virtual address
 		int currentAddress = vaddr;
+
+		// While there is still data to transfer
 		while(length > 0){
 			// Get the virtual page from the current address 
 			int vpn             = Machine.processor().pageFromAddress(currentAddress);
 			// Also get the offset of the current address 
-			int offset2         = Machine.processor().offsetFromAddress(currentAddress);
+			int vpnOffset       = Machine.processor().offsetFromAddress(currentAddress);
 			// The virtual to physical page translation 
 			TranslationEntry et = (isWrite) ? getWriteTE(vpn) : getReadTE(vpn);
 
 			if(et == null){ return currentAddress; }
 
-			int paddr  = Machine.processor().makeAddress(et.ppn, offset2);		
+			// get the physical address 
+			int paddr = Machine.processor().makeAddress(et.ppn, vpnOffset);
 
-		    if(paddr < 0 || paddr >= memory.length) { handleException(Machine.processor().exceptionAddressError); }
-
-		    int nextPage = Machine.processor().pageFromAddress(paddr) + 1;
-		    int nextAddr = Machine.processor().makeAddress(nextPage, 0) - paddr;
-		    int amount   = Math.min(length, nextAddr);
+			// Get the amount transfered 
+		    int amount = Math.min(length, pageSize - vpnOffset);
 
 		    // If the isWrite flag is set, then we are writing virtual mem, else we are reading virtual mem
 		    if(isWrite){
-		    	System.arraycopy(data, offset, memory, paddr, amount);
+		    	// writeVirtualMem
+				System.arraycopy(data, offset, memory, paddr, amount);
 		    } else {
-		    	System.arraycopy(memory, paddr, data, offset, amount);
+		    	// ReadVirtualMem
+				System.arraycopy(memory, paddr, data, offset, amount);
 		    }
-		    
-		    currentAddress = currentAddress + amount;
-		    offset = offset + amount;
+
+		    // subtract transfered data
 		    length = length - amount;
+		    // Add the amount read
+		    offset = offset + amount;
+		    currentAddress = currentAddress + amount;
 		}
 
 		return currentAddress;
+	}
+
+	private TranslationEntry getWriteTE(int vpn){
+		if (vpn < 0 || vpn >= numPages || pageTable[vpn] == null){ 
+			Lib.debug(dbgProcess, "MMM: getWriteTE null " + " vpn: " + vpn);
+			return null;
+		}
+		
+		TranslationEntry translationEntry = pageTable[vpn];
+		translationEntry.used = true;
+		translationEntry.dirty = true;
+
+		if (translationEntry.readOnly){ return null; }
+		return translationEntry;
 	}
 
 	private TranslationEntry getReadTE(int vpn){
@@ -231,20 +250,6 @@ public class UserProcess {
 
 		// Return the number of bytes transferred 
 		return readWriteHelper(vaddr, data, offset, length, memory, true) - vaddr;
-	}
-
-	private TranslationEntry getWriteTE(int vpn){
-		if (vpn < 0 || vpn >= numPages || pageTable[vpn] == null){ 
-			Lib.debug(dbgProcess, "MMM: getWriteTE null " + " vpn: " + vpn);
-			return null;
-		}
-		
-		TranslationEntry translationEntry = pageTable[vpn];
-		translationEntry.used = true;
-		translationEntry.dirty = true;
-
-		if (translationEntry.readOnly){ return null; }
-		return translationEntry;
 	}
 
 	/**
@@ -341,7 +346,7 @@ public class UserProcess {
 	 * 
 	 * @return <tt>true</tt> if the sections were successfully loaded.
 	 */
-	protected boolean loadSections() {
+		protected boolean loadSections() {
 		if (numPages > Machine.processor().getNumPhysPages()) {
 			coff.close();
 			Lib.debug(dbgProcess, "\tinsufficient physical memory");
@@ -368,16 +373,25 @@ public class UserProcess {
 
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
-				int ppn = physicalPageNums[vpn];
-				pageTable[vpn] = new TranslationEntry(vpn, ppn, true, section.isReadOnly(), false, false);
-				section.loadPage(i, ppn);
+				// Check if the index is within the physical page range
+				if(vpn < physicalPageNums.length){
+					int ppn = physicalPageNums[vpn];
+					pageTable[vpn] = new TranslationEntry(vpn, ppn, true, section.isReadOnly(), false, false);
+					section.loadPage(i, ppn);
+				}
+				else{
+					// Array out of bounds
+					Lib.debug(dbgProcess, "MMM: array out of bounds");
+					return false;
+				}
 			}
 		}
 
-		// allocate free pages for stack and argv
+		// Allocate the free pages 
 		for (int i = numPages - stackPages - 1; i < numPages; i++) {
 			pageTable[i] = new TranslationEntry(i, physicalPageNums[i], true, false, false, false);
 		}
+		
 		return true;
 	}
 

@@ -4,9 +4,11 @@ Mark Darmadi
 		and addToFiles. 
 		Worked on the first part of loadSection.
 		getReadTE and getWriteTE are just helper methods for tableEntries. 
+		rewrote with Kacy how readWriteHelper was implemented. 
 	- how well it worked
 		For all the functions written, no corner case checks were made. Mo was 
 		responsible for all the error checkings.
+		Added extra checks to make sure that the loadSection was fully implemented
 	- how Mark contributed to the project
 		Significant part in handleWrite, handleRead, handleOpen, getFile, addToFiles, handleExit, allocatePages and releasePages. 
 		
