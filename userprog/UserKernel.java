@@ -112,7 +112,6 @@ public class UserKernel extends ThreadedKernel {
 		super.terminate();
 	}
 
-
 	public static int[] allocatePages(int numPages) { 
 		lock.acquire();
 
