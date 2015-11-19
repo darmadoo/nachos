@@ -139,11 +139,9 @@ public class UserProcess {
 		Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
 		// Get the physical memory of the MIPS machine
 		byte[] memory = Machine.processor().getMemory();
-		// Check for corner cases 
-		if (vaddr < 0 || vaddr >= memory.length) {
-			Lib.debug(dbgProcess, "MMM: invalid virtual address");
-			return -1;
-		}
+
+		// Check if virtual address is valid
+		if (vaddr < 0 || vaddr >= memory.length) { return -1; }
 
 		// Return the number of bytes transferred 
 		return (readWriteHelper(vaddr, data, offset, length, memory, false) - vaddr);
@@ -166,7 +164,7 @@ public class UserProcess {
 			if(et == null){ return currentAddress; }
 
 			// get the physical address 
-			int paddr = Machine.processor().makeAddress(et.ppn, vpnOffset);
+			int physicalAddress = Machine.processor().makeAddress(et.ppn, vpnOffset);
 
 			// Get the amount transfered 
 		    int amount = Math.min(length, pageSize - vpnOffset);
@@ -174,10 +172,10 @@ public class UserProcess {
 		    // If the isWrite flag is set, then we are writing virtual mem, else we are reading virtual mem
 		    if(isWrite){
 		    	// writeVirtualMem
-				System.arraycopy(data, offset, memory, paddr, amount);
+				System.arraycopy(data, offset, memory, physicalAddress, amount);
 		    } else {
 		    	// ReadVirtualMem
-				System.arraycopy(memory, paddr, data, offset, amount);
+				System.arraycopy(memory, physicalAddress, data, offset, amount);
 		    }
 
 		    // subtract transfered data
@@ -245,7 +243,8 @@ public class UserProcess {
 		Lib.assertTrue(offset >= 0 && length >= 0 && offset + length <= data.length);
 		// Get the physical memory of the MIPS machine	
 		byte[] memory = Machine.processor().getMemory();
-		// Check for corner cases
+
+		// Check if virtual address is valid.
 		if (vaddr < 0 || vaddr >= memory.length) { return -1; }
 
 		// Return the number of bytes transferred 
@@ -346,10 +345,10 @@ public class UserProcess {
 	 * 
 	 * @return <tt>true</tt> if the sections were successfully loaded.
 	 */
-		protected boolean loadSections() {
+	protected boolean loadSections() {
+		// Not enough memory
 		if (numPages > Machine.processor().getNumPhysPages()) {
 			coff.close();
-			Lib.debug(dbgProcess, "\tinsufficient physical memory");
 			return false;
 		}
 
@@ -368,9 +367,6 @@ public class UserProcess {
 		// load sections
 		for (int s = 0; s < coff.getNumSections(); s++) {
 			CoffSection section = coff.getSection(s);
-
-			Lib.debug(dbgProcess, "\tinitializing " + section.getName() + " section (" + section.getLength() + " pages)");
-
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
 				// Check if the index is within the physical page range
@@ -381,7 +377,7 @@ public class UserProcess {
 				}
 				else{
 					// Array out of bounds
-					Lib.debug(dbgProcess, "MMM: array out of bounds");
+					// Lib.debug(dbgProcess, "MMM: array out of bounds");
 					return false;
 				}
 			}
@@ -547,25 +543,14 @@ public class UserProcess {
 
 		if(count < 0 || buffer < 0){ return -1; }
 
-		// Get current file.
+		// Get current file and check if its valid
 		OpenFile openFile = getFile(fileDescriptor);
+		if(openFile == null){ return -1; }
 
-		if(openFile == null){
-			Lib.debug(dbgProcess, "MMM: Failed to open file");
-			return -1;
-		}
-
-		// Allocate a byte buffer
+		// Allocate a byte buffer and check if its valid
 		byte dataBuffer[] = new byte[count];
 		int r = readVirtualMemory(buffer, dataBuffer, 0, count);
-
-		if(r == -1){
-			// Buffer is invalid
-			Lib.debug(dbgProcess, "MMM: r == 0 ");
-			return -1;
-		}
-
-		// public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
+		if(r == -1){ return -1;	}
 
 		return openFile.write(dataBuffer, 0, r);
 	}
@@ -579,48 +564,37 @@ public class UserProcess {
 		OpenFile tempOpenFile = UserKernel.fileSystem.open(fileName, false);
 
 		// File is invalid 
-		if(tempOpenFile == null){
-			Lib.debug(dbgProcess, "MMM: Failed to open file");
-			return -1; 
-		}
+		if(tempOpenFile == null){ return -1; }
 
 		return addToFiles(tempOpenFile);
 
 	}
 
 	protected int handleRead(int fileDescriptor, int buffer, int count) {
-		Lib.debug(dbgProcess, "MMM: write read: " + buffer);
-		if(fileDescriptor < 0 || fileDescriptor >= files.length || count < 0 || buffer < 0){ 
-			Lib.debug(dbgProcess, "MMM: fd is invalid or count is invalid or buffer is invalid");
-			return -1; 
-		}
+		// Check file descriptor, count, and buffer
+		if(fileDescriptor < 0 || fileDescriptor >= files.length || count < 0 || buffer < 0){ return -1; }
 
-		// Open the file 
+		// Open the file and check if it is valid
 		OpenFile openFile = getFile(fileDescriptor);
+		if(openFile == null){ return -1; }
 
-		if(openFile == null){ 
-			Lib.debug(dbgProcess, "MMM: Failed to open file");
-			return -1; 
-		}
-
+		// Get length and check if its valid
 		byte buf[] = new byte[count];
 		int length = openFile.read(buf, 0, count);
-		if (length < 0) { 
-			Lib.debug(dbgProcess, "MMM: Length is invalid");
-			return -1; 
-		}
+		if (length < 0) { return -1; }
 
 		return writeVirtualMemory(buffer, buf, 0, length);
 	}
 
 	protected int handleClose(int fileDescriptor) {
+		// Invalid file descriptor
+		if(fileDescriptor < 0 || fileDescriptor >= files.length) { return -1; }
+		
 		// Open the file 
 		OpenFile openFile = getFile(fileDescriptor);
 			
-		if(openFile == null) {
-			Lib.debug(dbgProcess, "MMM: file descriptor doesn't exist");
-			return -1;
-		}
+		// File descriptor doesn't exist
+		if(openFile == null) { return -1; }
 		// Clear	
 		files[fileDescriptor] = null;
 		openFile.close();
@@ -629,14 +603,12 @@ public class UserProcess {
 
 	protected int handleUnlink(int name) {
 		String fileName = readVirtualMemoryString(name, maxStringLength);
-		if (fileName == null) { 
-			Lib.debug(dbgProcess, "MMM: Filename is invalid");
-			return -1; 
-		}
-		if (!UserKernel.fileSystem.remove(fileName)){ 
-			Lib.debug(dbgProcess, "MMM: Failed to remove");
-			return -1; 
-		}
+
+		// Filename is invaild
+		if (fileName == null) { return -1; }
+
+		// Try to remove file.
+		if (!UserKernel.fileSystem.remove(fileName)){ return -1; }
 
 		return 0;
 	}
@@ -645,7 +617,6 @@ public class UserProcess {
 		exitStatus = status;
 		exitProperly = true;
 		unloadSections();
-		// childProcesses.clear();
 
 		// Start at 2 because the first 2 are stdin and stdout  
 		for (int i = 2; i < maxFileCount; i++){
@@ -667,18 +638,14 @@ public class UserProcess {
 	protected int handleCreat(int name) {
 		String fileName = readVirtualMemoryString(name, maxStringLength);
 
-		if (fileName == null) { 
-			Lib.debug(dbgProcess, "MMM: Failed to open file");
-			return -1; 
-		}
+		// Failed to open file
+		if (fileName == null) { return -1; }
 
 		// Open file 
 		OpenFile file = UserKernel.fileSystem.open(fileName, true);
 
-		if (file == null) { 
-			Lib.debug(dbgProcess, "MMM: Failed to open file");
-			return -1;
-		}
+		// File does not exist
+		if (file == null) { return -1; }
 
 		return addToFiles(file);
 	}
