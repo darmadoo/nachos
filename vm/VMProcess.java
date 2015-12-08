@@ -9,25 +9,23 @@ import nachos.vm.*;
  * A <tt>UserProcess</tt> that supports demand-paging.
  */
 public class VMProcess extends UserProcess {
-	/**
-	 * Allocate a new process.
-	 */
+
+	private static final int pageSize = Processor.pageSize;
+	private static final char dbgProcess = 'a';
+	private static final char dbgVM = 'v';
+
 	public VMProcess() {
 		super();
 	}
 
-	/**
-	 * Save the state of this process in preparation for a context switch.
-	 * Called by <tt>UThread.saveState()</tt>.
-	 */
+	/** * Save the state of this process in preparation for a context switch.
+	 * Called by <tt>UThread.saveState()</tt>. */
 	public void saveState() {
 		super.saveState();
 	}
 
-	/**
-	 * Restore the state of this process after a context switch. Called by
-	 * <tt>UThread.restoreState()</tt>.
-	 */
+	/** * Restore the state of this process after a context switch. Called by
+	 * <tt>UThread.restoreState()</tt>. */
 	public void restoreState() {
 		super.restoreState();
 	}
@@ -42,9 +40,7 @@ public class VMProcess extends UserProcess {
 		return super.loadSections();
 	}
 
-	/**
-	 * Release any resources allocated by <tt>loadSections()</tt>.
-	 */
+	/** * Release any resources allocated by <tt>loadSections()</tt>. */
 	protected void unloadSections() {
 		super.unloadSections();
 	}
@@ -58,22 +54,24 @@ public class VMProcess extends UserProcess {
 	 */
 	public void handleException(int cause) {
 		int offendingAddress;
+		int virtualPageNumber;
 		Processor processor = Machine.processor();
 
 		switch (cause) {
 	        case Processor.exceptionTLBMiss:
-                int offendingAddress = Machine.processor().readRegister(Processor.regBadVAddr);
+                offendingAddress = Machine.processor().readRegister(Processor.regBadVAddr);
+                virtualPageNumber = Processor.pageFromAddress(offendingAddress);
+                if (!addressIsValid(virtualPageNumber)) {
+	                initializePage(VMKernel.getAvailablePage(this, virtualPageNumber), virtualPageNumber);
+	            }
 	            break;
-
 			default:
 				super.handleException(cause);
 				break;
 		}
 	}
 
-	private static final int pageSize = Processor.pageSize;
-
-	private static final char dbgProcess = 'a';
-
-	private static final char dbgVM = 'v';
+    public boolean addressIsValid(int virtualPageNumber) {
+    	return false;
+    }
 }
