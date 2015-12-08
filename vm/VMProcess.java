@@ -57,12 +57,17 @@ public class VMProcess extends UserProcess {
 	 * @param cause the user exception that occurred.
 	 */
 	public void handleException(int cause) {
+		int offendingAddress;
 		Processor processor = Machine.processor();
 
 		switch (cause) {
-		default:
-			super.handleException(cause);
-			break;
+	        case Processor.exceptionTLBMiss:
+                int offendingAddress = Machine.processor().readRegister(Processor.regBadVAddr);
+	            break;
+
+			default:
+				super.handleException(cause);
+				break;
 		}
 	}
 
