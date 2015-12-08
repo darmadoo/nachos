@@ -18,13 +18,15 @@ public class VMProcess extends UserProcess {
 		super();
 	}
 
-	/** * Save the state of this process in preparation for a context switch.
+	/** 
+	 * Save the state of this process in preparation for a context switch.
 	 * Called by <tt>UThread.saveState()</tt>. */
 	public void saveState() {
 		super.saveState();
 	}
 
-	/** * Restore the state of this process after a context switch. Called by
+	/** 
+	 * Restore the state of this process after a context switch. Called by
 	 * <tt>UThread.restoreState()</tt>. */
 	public void restoreState() {
 		//super.restoreState();
