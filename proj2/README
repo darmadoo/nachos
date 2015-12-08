@@ -1,29 +1,42 @@
 Mark Darmadi
-	-what code you wrote
-		Wrote loadsections and a few of the system call handler functions.
-	-how well it worked
-		Badly. But with enough tears, it eventually worked.
-	-how was the code tested
-		Mohammed did the testing.
-	-how Mark contributed to the project
-		Coded
+	- what code you wrote
+		Initial stages of handleWrite, handleRead, handleHalt changes and getFile
+		and addToFiles. 
+		Worked on the first part of loadSection.
+		getReadTE and getWriteTE are just helper methods for tableEntries. 
+		rewrote with Kacy how readWriteHelper was implemented. 
+	- how well it worked
+		For all the functions written, no corner case checks were made. Mo was 
+		responsible for all the error checkings.
+		Added extra checks to make sure that the loadSection was fully implemented
+	- how Mark contributed to the project
+		Significant part in handleWrite, handleRead, handleOpen, getFile, addToFiles, handleExit, allocatePages and releasePages. 
 		
 Mohammed Islam
-	-what code you wrote
-		Most of the system call handler functions.
-	-how well it worked
-		Not too well for a long time. Eventually it did.
-	-how was the code tested
-		Code was tested using the test initially provided. Also used tests the volker made, write1, write4, write10, and snake.
-	-how Mo contributed to the project
-		Handled all the testing, did a lot of administrative stuff, wrote most system call handler functions.
+	- what code you wrote
+		Most of the system call handler functions, handleCreat, handleOpen, handleRead, handleWrite, handleClose, handleUnlink, handleExec, handleUnlink
+		Worked on readWriteHelper with Micah to complete writeVirtualMemory and
+		readVirtualMemory
+		Completed unloadSection
+	- how well it worked
+		We were getting caught in infinite loops all the time which was why write10 was failing alot and the we were failing the two last chekcs in the autograder. 
+	- how Mo contributed to the project
+		Mostly working all over the place with everything. Guiding Mark and Micah what else is left to be implemented and touching almost every part of the code we wrote. 
+		
 
 Micah Rothenbuhler	
-	-what code you wrote
+	- what code you wrote
+		helped write the skeleton for handleExec, handleUnlink and handleExit
 		ReadVirtualMemory and WriteVirtualMemory.
-	-how well it worked
-		Like a freakin charm after a while. Was difficult at first
-	-how was the code tested
-		Mohammed did the testing.
-	-how Micah contributed to the project
-		Well. I wrote some of the code.
+	- how well it worked
+		With the help of Kacy and other tutors. The implementation for ReadVirtualMemory and WriteVirtualMemory was easily laid out and not much corner case testing was needed because of the tutor's aid. 
+	- how Micah contributed to the project
+		Made sure all our codes were commented thoroughly and wrote a significant chunk of ReadVirtualMemory and WriteVirtualMemory.
+
+
+how was the code tested
+	Code was tested using the test initially provided. Also used tests the volker made, write1, write4, write10, and snake.
+	We also made a new test function called halt.c which tested the functionality of halt. 
+	Attempts were made in testing the pageTable and the entryTranslation by reversing the order of the mapping but we gave up because we did not know if our implementation was actually right and we were not exactly sure if we are tesing the right thing. 
+	Milestone checks were also made. Such as after implementing exec, we created a process and ran it just for sanity checks. 
+	Same thing was done for handleRead, handleWrite, handleOpen where we would hard code the file name to just see if it was working. 
