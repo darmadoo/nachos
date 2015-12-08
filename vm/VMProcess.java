@@ -74,6 +74,6 @@ public class VMProcess extends UserProcess {
 	}
 
     public boolean addressIsValid(int virtualPageNumber) {
-    	return false;
+    	return pageTable[virtualPageNumber].valid;
     }
 }
