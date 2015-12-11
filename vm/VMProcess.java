@@ -14,10 +14,11 @@ public class VMProcess extends UserProcess {
 	private static final char dbgProcess = 'a';
 	private static final char dbgVM = 'v';
 
-	private static int currentHand = 0;
+	private static Lock lock;
 
 	public VMProcess() {
 		super();
+		lock = new Lock();
 	}
 
 	/** 
@@ -26,12 +27,12 @@ public class VMProcess extends UserProcess {
 	public void saveState() {
 		// Invalidate all TLB entries
 		for (int i = 0; i < Machine.processor().getTLBSize(); i++) {
-			TranslationEntry entry = Machine.processor().readTLBEntry(i);
-			if(entry.valid){
-				entry.valid = false;
-				pageTable[entry.vpn].dirty = entry.dirty;     
-				pageTable[entry.vpn].used = entry.used;
-
+			TranslationEntry curEntry = Machine.processor().readTLBEntry(i);
+			if(curEntry.valid){
+				curEntry.valid = false;
+				pageTable[curEntry.vpn].dirty = curEntry.dirty;     
+				pageTable[curEntry.vpn].used = curEntry.used;
+				VMKernel.invertedTable[curEntry.ppn].entry.used=curEntry.used;  
 				// TODO
 				//When to sync TLB entry bits back to page table ? 
 				// Before evicting a (valid) TLB entry
@@ -40,8 +41,8 @@ public class VMProcess extends UserProcess {
 
 				// Need to write entries back to the page table if necessary
 				// When the pageTable's valid bit is not updated
-				if(pageTable[entry.vpn].valid){
-					Machine.processor().writeTLBEntry(i, entry);
+				if(pageTable[curEntry.vpn].valid){
+					Machine.processor().writeTLBEntry(i, curEntry);
 				}
 			}
 			
@@ -65,6 +66,20 @@ public class VMProcess extends UserProcess {
 	 * @return <tt>true</tt> if successful.
 	 */
 	protected boolean loadSections() {
+
+		/*
+		lock.acquire();
+		// initialize page table with an array of TranslationEntry (TE)
+		pageTable = new TranslationEntry[numPages];
+		for(int i = 0; i < pageTable.length; i++){
+			// intialize vpn with no physical mapping and valid false;
+			pageTable[i] = new TranslationEntry(i, -1, false, false, false, false);
+		}
+
+		lock.release();
+		return true;
+		*/
+
 		return super.loadSections();
 	}
 
@@ -74,17 +89,13 @@ public class VMProcess extends UserProcess {
 	}
 
 	public int allocateTLBEntry(int vpn){
-		// print("inside allocateTLBEntry()");
 		// Index for the invalid entry 
 		int invalidEntry = -1;
-
-		// print("the size is " + Machine.processor().getTLBSize());
 
 		// Go through the TLB 
 		for(int i = 0; i < (Machine.processor().getTLBSize()) && (invalidEntry == -1); i++){
 			TranslationEntry entry = Machine.processor().readTLBEntry(i);
 			if(!entry.valid){
-				// print("it stopped at " + i);
 				// This is the invalid entry 
 				invalidEntry = i;
 			}
@@ -93,11 +104,8 @@ public class VMProcess extends UserProcess {
 		// If there are no invalid entries, we need to evict one page.
 		if(invalidEntry == -1){
 			invalidEntry = (int)Lib.random();
-			// print("the new invalid entry is " + invalidEntry);
 		}
 
-		// print("index is " + invalidEntry);
-		//Machine.processor().writeTLBEntry(invalidEntry, pageTable[vpn]);
 		return invalidEntry;
 	}
 
@@ -105,26 +113,26 @@ public class VMProcess extends UserProcess {
 		int vaddr = Machine.processor().readRegister(Processor.regBadVAddr);
 		int vpn = Processor.pageFromAddress(vaddr);
 
-		Machine.processor().writeTLBEntry(index,pageTable[vpn]); 
+		TranslationEntry newEntry = new TranslationEntry(pageTable[vpn]);
+
+		TranslationEntry toBeReplaced = Machine.processor().readTLBEntry(index);
+
+		Machine.processor().writeTLBEntry(index, newEntry); 
 	}
 
 	public void handleTLBMiss(){
-
 		// System.out.println("inside handleTBLMiss()");
 
-		// Get page table entry from VPN 
 		int vaddr = Machine.processor().readRegister(Processor.regBadVAddr);
 		int vpn = Processor.pageFromAddress(vaddr);
+		VMProcess curProcess = this;
 
 		if(vpn < 0 || vpn >= pageTable.length){
 			//VMKernel.terminate();
 			// out of bounds 
 		}
 
-		// for(int i = 0; i < pageTable.length; i++){
-		// 	print("Page table " + i + " is " + pageTable[i].vpn + " and " + pageTable[i].ppn);
-		// }
-		// System.out.println("ACHOO " + vpn);
+		// Get page table entry from VPN 
 		TranslationEntry entry = pageTable[vpn];
 
 		// Check if valid 
@@ -133,6 +141,14 @@ public class VMProcess extends UserProcess {
 
 			// Get ppn
 			int ppn = allocatePPN(vpn);
+
+			// If there is a entry in the table already evict one, else place it in
+			if(VMKernel.invertedTable[ppn].isSet){
+				VMKernel.findInvertSpace(ppn, vpn);
+			}
+			
+			// Place the ppn into the inverted table
+			VMKernel.insertInvertEntry(ppn, vpn, curProcess);
 
 			// Check if the page is dirty 
 			if(pageTable[vpn].dirty){
@@ -146,7 +162,7 @@ public class VMProcess extends UserProcess {
 			pageTable[vpn].vpn = vpn;
 		}
 
-		// Allocate a TLB entry 
+		// Allocate a TLB entry and get the page to be evicted
 		int index = allocateTLBEntry(vpn);
 
 		// Update TLB entry 
@@ -163,53 +179,33 @@ public class VMProcess extends UserProcess {
 			ppn = ((Integer)VMKernel.freePages.removeFirst()).intValue();
 		}
 		else{
+			// ==== NO FREE PAGES IN THE FREE PAGE LIST ==== // 
+
 			// incase invalid
 			ppn = -1;
 
 			VMKernel.memoryLock.acquire();
-			// Fill the inverted table 
-			fillInvertedTable();
-			ppn = replacementAlgorithm();
+			ppn = VMKernel.replacementAlgorithm();
+
+
 
 			VMKernel.memoryLock.release();
 		}
 		return ppn;
 	}
 
-	public void fillInvertedTable(){
-		for(int i = 0; i < Machine.processor().getTLBSize(); i++){
-			TranslationEntry entry = Machine.processor().readTLBEntry(i);
-			if(entry.vpn == pageTable[entry.vpn].vpn){
-				if(entry.valid){
-	                VMKernel.invertedTable[entry.ppn].pageTable[entry.vpn].used = entry.used;
-					VMKernel.invertedTable[entry.ppn].pageTable[entry.vpn].dirty = entry.dirty;
-				}
-			}
-		}
-	}
-
-	public int replacementAlgorithm(){
-		int ptr = currentHand;
-
-		int pnum = VMKernel.invertedTable.length;
-		VMProcess curProcess = VMKernel.invertedTable[ptr];
-		TranslationEntry curEntry = curProcess.pageTable[ptr];
-
-		while(curEntry.used == true){
-			curEntry.used = false;
-			ptr = (ptr + 1) % pnum;
-		}
-
-		int toEvict = ptr;
-		ptr = (ptr + 1) % pnum;
-
-		return toEvict;
-	}
-
 	public void print(String x){
 		System.out.println(x);
 	}
 
+/*
+	protected int pinVirtualPage(int vpn, boolean userWrite)
+	{
+		return 2;
+	}
+	protected void unpinVirtualPage(int vpn){
+	}
+*/
 	/**
 	 * Handle a user exception. Called by <tt>UserKernel.exceptionHandler()</tt>
 	 * . The <i>cause</i> argument identifies which exception occurred; see the
@@ -223,15 +219,6 @@ public class VMProcess extends UserProcess {
 		Processor processor = Machine.processor();
 
 		switch (cause) {
-			/*
-	        case Processor.exceptionTLBMiss:
-                offendingAddress = Machine.processor().readRegister(Processor.regBadVAddr);
-                virtualPageNumber = Processor.pageFromAddress(offendingAddress);
-                if (!addressIsValid(virtualPageNumber)) {
-	                initializePage(VMKernel.getAvailablePage(this, virtualPageNumber), virtualPageNumber);
-	            }
-	            break;
-	            */
             case Processor.exceptionTLBMiss:            
    				handleTLBMiss();            
    				break;   

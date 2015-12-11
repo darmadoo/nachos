@@ -25,8 +25,9 @@ public class VMKernel extends UserKernel {
 		super.initialize(args);
 
 		swapFile = ThreadedKernel.fileSystem.open("swap.swp", true); 
-		invertedTable = new VMProcess[Machine.processor().getNumPhysPages()];
+		makeInvertedTable();
 		processLock = new Lock();
+		unpinnedPage = new Condition(processLock);
 	
 		memoryLock = new Lock();	
 		for (int ppn=0; ppn<Machine.processor().getNumPhysPages(); ppn++){
@@ -34,15 +35,74 @@ public class VMKernel extends UserKernel {
 	    }
 	}
 
-	public static void getSwapPage(int pagePPN, int ppn){
-		int saddr = pagePPN * pageSize;
+	public void makeInvertedTable(){
+		invertedTable = new frame[Machine.processor().getNumPhysPages()];
+
+		for(int i = 0; i < Machine.processor().getNumPhysPages(); i++){
+			invertedTable[i] = new frame(new TranslationEntry(), null, false, false);
+		}
+	}
+
+	public static void getSwapPage(int spn, int ppn){
+		int saddr = spn * pageSize;
 		byte[] memory = Machine.processor().getMemory();
 		int paddr = ppn * pageSize;
 
 		swapFile.read(saddr, memory, paddr, pageSize);
-		freeSwapPages.add(pagePPN);
+		freeSwapPages.add(spn);
 
 		return;
+	}
+
+	public static int replacementAlgorithm(){
+		int ptr = currentHand;
+		int toEvict;
+		boolean allPinned = false;
+
+		while(true){
+			if(invertedTable[ptr].entry.used){
+				invertedTable[ptr].entry.used = false;
+				ptr++;
+			}
+			else{
+				if(invertedTable[ptr].pinned){
+
+				}
+				else{
+					currentHand = ptr;
+					ptr++;
+					break;
+				}
+			}
+
+			// Corner case where all pages are pinned 
+			if(!allPinned && ptr > Machine.processor().getNumPhysPages()){
+				// need a condition variable to sleep
+				unpinnedPage.sleep();
+				// Need to call condVar.wake() at unpinPage();
+			}
+		}
+
+		return currentHand;
+	}
+
+	public static void insertInvertEntry(int ppn, int vpn, VMProcess cur){
+		frame temp = invertedTable[ppn];
+
+		temp.entry.ppn = ppn;
+		temp.entry.vpn = vpn;
+		temp.entry.valid = true;
+		temp.entry.used = true;
+
+
+		temp.vmproc = cur;
+		temp.isSet = true;
+	}
+
+	public static void findInvertSpace(int ppn, int vpn){
+		int oldVpn = invertedTable[ppn].entry.vpn;
+		VMProcess oldProc = invertedTable[ppn].vmproc;
+
 	}
 
 	/**
@@ -88,7 +148,9 @@ public class VMKernel extends UserKernel {
 
     private static final int pageSize = Processor.pageSize;
 
-    public static VMProcess[] invertedTable;
+    public static frame[] invertedTable;
 
+   	private static int currentHand = 0;
 
+   	private static Condition unpinnedPage;
 }
