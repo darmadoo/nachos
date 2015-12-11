@@ -54,6 +54,25 @@ public class VMKernel extends UserKernel {
 		return;
 	}
 
+	public static int writeSwapPage(int ppn){
+
+		int spn;
+		if(freeSwapPages.isEmpty()){
+			spn = freeSwapPagesSize;
+			freeSwapPagesSize++;
+		}
+		else{
+			spn = freeSwapPages.remove();
+		}
+
+		int saddr = spn * pageSize;
+		byte[] memory = Machine.processor().getMemory();
+		int paddr = ppn * pageSize;
+
+		swapFile.write(saddr, memory, paddr, pageSize);
+		return spn;
+	}
+
 	public static int replacementAlgorithm(){
 		int ptr = currentHand;
 		int toEvict;
@@ -99,12 +118,6 @@ public class VMKernel extends UserKernel {
 		temp.isSet = true;
 	}
 
-	public static void findInvertSpace(int ppn, int vpn){
-		int oldVpn = invertedTable[ppn].entry.vpn;
-		VMProcess oldProc = invertedTable[ppn].vmproc;
-
-	}
-
 	/**
 	 * Test this kernel.
 	 */
@@ -144,7 +157,8 @@ public class VMKernel extends UserKernel {
     // The swap file 
     private static OpenFile swapFile;
 
-  	private static LinkedList freeSwapPages = new LinkedList();
+  	private static LinkedList<Integer> freeSwapPages = new LinkedList();
+  	private static int freeSwapPagesSize = 0;
 
     private static final int pageSize = Processor.pageSize;
 

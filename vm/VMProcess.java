@@ -125,7 +125,6 @@ public class VMProcess extends UserProcess {
 
 		int vaddr = Machine.processor().readRegister(Processor.regBadVAddr);
 		int vpn = Processor.pageFromAddress(vaddr);
-		VMProcess curProcess = this;
 
 		if(vpn < 0 || vpn >= pageTable.length){
 			//VMKernel.terminate();
@@ -141,14 +140,6 @@ public class VMProcess extends UserProcess {
 
 			// Get ppn
 			int ppn = allocatePPN(vpn);
-
-			// If there is a entry in the table already evict one, else place it in
-			if(VMKernel.invertedTable[ppn].isSet){
-				VMKernel.findInvertSpace(ppn, vpn);
-			}
-			
-			// Place the ppn into the inverted table
-			VMKernel.insertInvertEntry(ppn, vpn, curProcess);
 
 			// Check if the page is dirty 
 			if(pageTable[vpn].dirty){
@@ -174,7 +165,6 @@ public class VMProcess extends UserProcess {
 		int ppn;
 		// if free page is not empty, get a ppn
 		if(!(VMKernel.freePages).isEmpty()){
-			print("Shadow Fiend");
 			// allocate physical page 
 			ppn = ((Integer)VMKernel.freePages.removeFirst()).intValue();
 		}
@@ -186,12 +176,51 @@ public class VMProcess extends UserProcess {
 
 			VMKernel.memoryLock.acquire();
 			ppn = VMKernel.replacementAlgorithm();
+			VMProcess curProcess = this;
 
-
+			// If there is a entry in the table already evict one, else place it in
+			if(VMKernel.invertedTable[ppn].isSet){
+				findInvertSpace(ppn, vpn);
+			}
+			
+			// Place the ppn into the inverted table
+			VMKernel.insertInvertEntry(ppn, vpn, curProcess);
 
 			VMKernel.memoryLock.release();
 		}
+		
 		return ppn;
+	}
+
+	public void findInvertSpace(int ppn, int vpn){
+		int oldVpn = VMKernel.invertedTable[ppn].entry.vpn;
+		VMProcess oldProc = VMKernel.invertedTable[ppn].vmproc;
+
+		if(oldVpn < 0 || oldVpn > Machine.processor().getNumPhysPages()){
+			// error check?
+		}
+
+		oldProc.addPage(oldVpn);
+	}
+
+	public void addPage(int oldVpn){
+		TranslationEntry entry = pageTable[oldVpn];
+		// needs to be swapped
+		if(entry.dirty){
+			// need to swap
+			entry.ppn = VMKernel.writeSwapPage(entry.ppn);
+		}
+
+		// invalidate the old vpn
+		entry.valid = false;
+
+		for(int i = 0; i < Machine.processor().getTLBSize(); i++){
+			TranslationEntry cur = Machine.processor().readTLBEntry(i);
+			if(cur.vpn == oldVpn){
+				// update the table
+				cur.valid = entry.valid;
+			}
+		}
 	}
 
 	public void print(String x){
