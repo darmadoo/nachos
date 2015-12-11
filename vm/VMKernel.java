@@ -73,6 +73,7 @@ public class VMKernel extends UserKernel {
 		return spn;
 	}
 
+	// TODO CHECK IF THIS WORKS 
 	public static int replacementAlgorithm(){
 		int ptr = currentHand;
 		int toEvict;
@@ -112,7 +113,6 @@ public class VMKernel extends UserKernel {
 		temp.entry.vpn = vpn;
 		temp.entry.valid = true;
 		temp.entry.used = true;
-
 
 		temp.vmproc = cur;
 		temp.isSet = true;

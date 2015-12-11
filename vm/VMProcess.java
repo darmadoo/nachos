@@ -33,7 +33,7 @@ public class VMProcess extends UserProcess {
 				pageTable[curEntry.vpn].dirty = curEntry.dirty;     
 				pageTable[curEntry.vpn].used = curEntry.used;
 				VMKernel.invertedTable[curEntry.ppn].entry.used=curEntry.used;  
-				// TODO
+				// TODO, FIND WHEN TO SYNC AGAIN
 				//When to sync TLB entry bits back to page table ? 
 				// Before evicting a (valid) TLB entry
 				// Before flushing a (valid) TLB entry
@@ -67,6 +67,7 @@ public class VMProcess extends UserProcess {
 	 */
 	protected boolean loadSections() {
 
+		// SOMEHOW THIS NEEDS TO BE CHANGED 
 		/*
 		lock.acquire();
 		// initialize page table with an array of TranslationEntry (TE)
@@ -85,6 +86,7 @@ public class VMProcess extends UserProcess {
 
 	/** * Release any resources allocated by <tt>loadSections()</tt>. */
 	protected void unloadSections() {
+		// THIS ALSO SOMEHOW NEEDS TO BE CHANGED 
 		super.unloadSections();
 	}
 
@@ -188,7 +190,7 @@ public class VMProcess extends UserProcess {
 
 			VMKernel.memoryLock.release();
 		}
-		
+
 		return ppn;
 	}
 
@@ -200,13 +202,9 @@ public class VMProcess extends UserProcess {
 			// error check?
 		}
 
-		oldProc.addPage(oldVpn);
-	}
-
-	public void addPage(int oldVpn){
 		TranslationEntry entry = pageTable[oldVpn];
-		// needs to be swapped
-		if(entry.dirty){
+		// needs to be swapped, read-only pages should never appear in the swap file 
+		if(entry.dirty && !entry.readOnly){
 			// need to swap
 			entry.ppn = VMKernel.writeSwapPage(entry.ppn);
 		}
@@ -214,6 +212,7 @@ public class VMProcess extends UserProcess {
 		// invalidate the old vpn
 		entry.valid = false;
 
+		// Sync the tlb entires back to the page table
 		for(int i = 0; i < Machine.processor().getTLBSize(); i++){
 			TranslationEntry cur = Machine.processor().readTLBEntry(i);
 			if(cur.vpn == oldVpn){
@@ -227,12 +226,14 @@ public class VMProcess extends UserProcess {
 		System.out.println(x);
 	}
 
+// DO THIS GUYS 
 /*
 	protected int pinVirtualPage(int vpn, boolean userWrite)
 	{
 		return 2;
 	}
 	protected void unpinVirtualPage(int vpn){
+		// NEED TO WAKE THE CONDITION VARIBALE UNPINNEDPAGE from kernel
 	}
 */
 	/**
