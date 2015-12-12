@@ -178,7 +178,6 @@ public class UserProcess {
 
 	return amount;
     }
-
     /**
      * Transfer all data from the specified array to this process's virtual
      * memory.
@@ -237,6 +236,7 @@ public class UserProcess {
 
 	return amount;
     }
+
     protected int pinVirtualPage(int vpn, boolean isUserWrite) {
 	if (vpn < 0 || vpn >= pageTable.length)
 	    return -1;
@@ -356,10 +356,10 @@ public class UserProcess {
      */
     protected boolean loadSections() {
 	// allocate memory
-	UserKernel.memoryLock.acquire();
+	UserKernel.lock.acquire();
 
 	if (UserKernel.freePages.size() < numPages) {
-	    UserKernel.memoryLock.release();
+	    UserKernel.lock.release();
 	    coff.close();
 	    Lib.debug(dbgProcess, "\tinsufficient physical memory");
 	    return false;
@@ -370,11 +370,14 @@ public class UserProcess {
 	for (int vpn=0; vpn<numPages; vpn++) {
 	    int ppn = ((Integer)UserKernel.freePages.removeFirst()).intValue();
 
+	    /* AHHHHHHHHH */
+	    UserKernel.addPPN(ppn,vpn,this);
+
 	    pageTable[vpn] = new TranslationEntry(vpn, ppn,
 						  true, false, false, false);
 	}
 	
-	UserKernel.memoryLock.release();
+	UserKernel.lock.release();
 
 	// load sections
 	for (int s=0; s<coff.getNumSections(); s++) {
@@ -400,7 +403,7 @@ public class UserProcess {
     protected void unloadSections() {
         for (int vpn=0; vpn<pageTable.length; vpn++)
 	    UserKernel.freePages.add(new Integer(pageTable[vpn].ppn));
-    }    
+    }  
 
     /**
      * Initialize the processor's registers in preparation for running the
@@ -442,11 +445,13 @@ public class UserProcess {
 	for (int i=0; i<maxFiles; i++)
 	    handleClose(i);
 
-	UserKernel.memoryLock.acquire();
+	// idiot
+	UserKernel.lock.acquire();
 
 	unloadSections();
 
-	UserKernel.memoryLock.release();
+	// micah is an idiot
+	UserKernel.lock.release();
 
 	coff.close();
 	
@@ -542,32 +547,32 @@ public class UserProcess {
 	if (fileName == null)
 	    return -1;
 
-	int fileDescriptor = -1;
+	int fileDescrmmmoor = -1;
 
 	for (int i=0; i<maxFiles; i++) {
 	    if (fileTable[i] == null) {
-		fileDescriptor = i;
+		fileDescrmmmoor = i;
 		break;
 	    }
 	}
-	if (fileDescriptor == -1)
+	if (fileDescrmmmoor == -1)
 	    return -1;
 
 	OpenFile of = ThreadedKernel.fileSystem.open(fileName, create);
 	if (of == null)
 	    return -1;
 
-	fileTable[fileDescriptor] = of;
-	return fileDescriptor;
+	fileTable[fileDescrmmmoor] = of;
+	return fileDescrmmmoor;
     }
 
-    private int handleRead(int fileDescriptor, int vaddrBuffer, int length) {
-	if (fileDescriptor<0 || fileDescriptor>=maxFiles)
+    private int handleRead(int fileDescrmmmoor, int vaddrBuffer, int length) {
+	if (fileDescrmmmoor<0 || fileDescrmmmoor>=maxFiles)
 	    return -1;
 	if (length<0)
 	    return -1;
 
-	OpenFile of = fileTable[fileDescriptor];
+	OpenFile of = fileTable[fileDescrmmmoor];
 	if (of == null)
 	    return -1;
 
@@ -594,13 +599,13 @@ public class UserProcess {
 	return total;
     }
 
-    private int handleWrite(int fileDescriptor, int vaddrBuffer, int length) {
-	if (fileDescriptor<0 || fileDescriptor>=maxFiles)
+    private int handleWrite(int fileDescrmmmoor, int vaddrBuffer, int length) {
+	if (fileDescrmmmoor<0 || fileDescrmmmoor>=maxFiles)
 	    return -1;
 	if (length<0)
 	    return -1;
 
-	OpenFile of = fileTable[fileDescriptor];
+	OpenFile of = fileTable[fileDescrmmmoor];
 	if (of == null)
 	    return -1;
 
@@ -628,16 +633,16 @@ public class UserProcess {
 	return total;
     }
 
-    private int handleClose(int fileDescriptor) {
-	if (fileDescriptor<0 || fileDescriptor>=maxFiles)
+    private int handleClose(int fileDescrmmmoor) {
+	if (fileDescrmmmoor<0 || fileDescrmmmoor>=maxFiles)
 	    return -1;
 
-	OpenFile of = fileTable[fileDescriptor];
+	OpenFile of = fileTable[fileDescrmmmoor];
 	if (of == null)
 	    return -1;
 
 	of.close();
-	fileTable[fileDescriptor] = null;
+	fileTable[fileDescrmmmoor] = null;
 
 	return 0;
     }
@@ -757,6 +762,8 @@ public class UserProcess {
 	    break;				       
 				       
 	default:
+	    System.out.println("Unexpected exception: " +
+		      Processor.exceptionNames[cause]);
 	    Lib.debug(dbgProcess, "Unexpected exception: " +
 		      Processor.exceptionNames[cause]);
 	    abnormalTermination = true;
@@ -795,4 +802,13 @@ public class UserProcess {
 	
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
+
+    /* HELPERS GO HERE */
+    public void invalidateVPN(int vpn){
+		pageTable[vpn].valid = false;
+    }
+    
+    public boolean readOnlyVPN(int vpn){
+		return pageTable[vpn].readOnly;
+    }
 }

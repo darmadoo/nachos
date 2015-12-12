@@ -5,166 +5,144 @@ import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.vm.*;
 
-import java.util.LinkedList;
+import java.util.*;
 
 /**
  * A kernel that can support multiple demand-paging user processes.
  */
 public class VMKernel extends UserKernel {
-	/**
-	 * Allocate a new VM kernel.
-	 */
-	public VMKernel() {
-		super();
-	}
 
-	/**
-	 * Initialize this kernel.
-	 */
-	public void initialize(String[] args) {
-		super.initialize(args);
-
-		swapFile = ThreadedKernel.fileSystem.open("swap.swp", true); 
-		makeInvertedTable();
-		processLock = new Lock();
-		unpinnedPage = new Condition(processLock);
-	
-		memoryLock = new Lock();	
-		for (int ppn=0; ppn<Machine.processor().getNumPhysPages(); ppn++){
-		    freePages.add(new Integer(ppn));
-	    }
-	}
-
-	public void makeInvertedTable(){
-		invertedTable = new frame[Machine.processor().getNumPhysPages()];
-
-		for(int i = 0; i < Machine.processor().getNumPhysPages(); i++){
-			invertedTable[i] = new frame(new TranslationEntry(), null, false, false);
-		}
-	}
-
-	public static void getSwapPage(int spn, int ppn){
-		int saddr = spn * pageSize;
-		byte[] memory = Machine.processor().getMemory();
-		int paddr = ppn * pageSize;
-
-		swapFile.read(saddr, memory, paddr, pageSize);
-		freeSwapPages.add(spn);
-
-		return;
-	}
-
-	public static int writeSwapPage(int ppn){
-
-		int spn;
-		if(freeSwapPages.isEmpty()){
-			spn = freeSwapPagesSize;
-			freeSwapPagesSize++;
-		}
-		else{
-			spn = freeSwapPages.remove();
-		}
-
-		int saddr = spn * pageSize;
-		byte[] memory = Machine.processor().getMemory();
-		int paddr = ppn * pageSize;
-
-		swapFile.write(saddr, memory, paddr, pageSize);
-		return spn;
-	}
-
-	// TODO CHECK IF THIS WORKS 
-	public static int replacementAlgorithm(){
-		int ptr = currentHand;
-		int toEvict;
-		boolean allPinned = false;
-
-		while(true){
-			if(invertedTable[ptr].entry.used){
-				invertedTable[ptr].entry.used = false;
-				ptr++;
-			}
-			else{
-				if(invertedTable[ptr].pinned){
-
-				}
-				else{
-					currentHand = ptr;
-					ptr++;
-					break;
-				}
-			}
-
-			// Corner case where all pages are pinned 
-			if(!allPinned && ptr > Machine.processor().getNumPhysPages()){
-				// need a condition variable to sleep
-				unpinnedPage.sleep();
-				// Need to call condVar.wake() at unpinPage();
-			}
-		}
-
-		return currentHand;
-	}
-
-	public static void insertInvertEntry(int ppn, int vpn, VMProcess cur){
-		frame temp = invertedTable[ppn];
-
-		temp.entry.ppn = ppn;
-		temp.entry.vpn = vpn;
-		temp.entry.valid = true;
-		temp.entry.used = true;
-
-		temp.vmproc = cur;
-		temp.isSet = true;
-	}
-
-	/**
-	 * Test this kernel.
-	 */
-	public void selfTest() {
-		super.selfTest();
-	}
-
-	/**
-	 * Start running user programs.
-	 */
-	public void run() {
-		super.run();
-	}
-
-	/**
-	 * Terminate this kernel. Never returns.
-	 */
-	public void terminate() {
-		swapFile.close();
-		ThreadedKernel.fileSystem.remove("swap.swp");
-		super.terminate();
-	}
-
-	// dummy variables to make javac smarter
-	private static VMProcess dummy1 = null;
-
-	private static final char dbgVM = 'v';
-
-	public static LinkedList freePages = new LinkedList();
-
-    /** Guards access to process data: lists, exit status tables, etc. */
-	public static Lock processLock;
-
-	/** Guards access to the physical page free list. */
-    public static Lock memoryLock;
-
-    // The swap file 
-    private static OpenFile swapFile;
-
-  	private static LinkedList<Integer> freeSwapPages = new LinkedList();
-  	private static int freeSwapPagesSize = 0;
-
+    private static VMProcess dummy1 = null;
+    private static final char dbgVM = 'v';
+    private static LinkedList freeSwapPages = new LinkedList();
+    public static OpenFile swapFile;
     private static final int pageSize = Processor.pageSize;
 
-    public static frame[] invertedTable;
+    /* OUR THINGS */
+    private static Condition unpinnedPage;
+    private static Iterator i;
 
-   	private static int currentHand = 0;
+    /**
+     * Allocate a new VM kernel.
+     */
+    public VMKernel() {
+        super();
+    }
 
-   	private static Condition unpinnedPage;
+    /**
+     * Initialize this kernel.
+     */
+    public void initialize(String[] args) {
+      	super.initialize(args);
+
+        unpinnedPage = new Condition(UserKernel.lock);
+      	swapFile = ThreadedKernel.fileSystem.open("swap.swap", true);
+    }
+
+    /**
+     * Test this kernel.
+     */
+    public void selfTest() {
+        super.selfTest();
+    }
+
+    /**
+     * Start running user programs.
+     */
+    public void run() {
+      	super.run();
+    }
+    
+    /**
+     * Terminate this kernel. Never returns.
+     */
+    public void terminate() {
+      	super.terminate();
+    }
+
+    public static int replacementAlgorithm() {
+
+        int victimPPN = findVictim();
+        ProcessHelper victim = mmmo.get(victimPPN);
+        VMProcess p = (VMProcess)victim.process;
+
+        if (p.getDirty(victim.vpn) && !p.readOnlyVPN(victim.vpn)) {
+            handleSwap(victimPPN);
+        }
+
+        p.invalidateVPN(victim.vpn);
+        UserKernel.removePPN(victimPPN);
+        return victimPPN;
+    }
+
+    private static int findVictim() {
+
+        int ppn;
+        for (ppn = -1; ppn < 0; ) {
+            for(int j = 0; j < mmmo.size(); j++){
+                ProcessHelper jPData = mmmo.get(new Integer(j));
+                VMProcess p = (VMProcess)jPData.process;
+                int vpn = jPData.vpn;
+
+                if (!p.evictableVPN(vpn)) {
+                    p.vpnNotRecentlyUsed(vpn);
+                } else {
+                    ppn = p.getPPN(vpn);
+                    j = mmmo.size(); // basically first loop again
+                }
+            }
+            if (ppn < 0){ unpinnedPage.sleep(); }
+        }
+        return ppn;
+    }
+
+    private static int determineSwapPage(int victimPPN) {
+
+        int res;
+        ProcessHelper victim = mmmo.get(victimPPN);
+        VMProcess p = (VMProcess)victim.process;
+
+        if (!(getParticularSwapPage(p, victim.vpn) != -1 && freeSwapPages.size() > 0)) {
+            res = swapFile.length() / pageSize + 1;
+            freeSwapPages.add(new Integer(res));
+        } else if (getParticularSwapPage(p, victim.vpn) != -1) {
+            res = getParticularSwapPage(p, victim.vpn);
+        } else {
+            res = ((Integer)freeSwapPages.removeFirst()).intValue();
+        }
+
+        return res;
+    }
+
+    /* give focus for grade*/
+    private static void handleSwap(int victimPPN) {
+
+        ProcessHelper victim = mmmo.get(victimPPN);
+        VMProcess p = (VMProcess)victim.process;
+        byte[] data = new byte[pageSize];
+        int page = determineSwapPage(victimPPN);
+        int size = page * pageSize;
+
+        if (getParticularSwapPage(p, victim.vpn) == -1) {
+            swapper.put(victim, new Integer(victimPPN));
+        }
+
+        System.arraycopy(Machine.processor().getMemory(), victimPPN * pageSize, data, 0, pageSize);
+        swapFile.write(size, data, 0, pageSize);
+    }
+
+    public static int getParticularSwapPage(UserProcess process, int target) {
+
+        i = swapper.keySet().iterator(); 
+        while (true) {
+            if (!i.hasNext()) {
+                return -1;
+            } else {
+                ProcessHelper next = (ProcessHelper)i.next(); 
+                if (next.process == process && next.vpn == target) {
+                    return swapper.get(next).intValue();
+                }
+            }
+        }
+    }
 }
